@@ -385,3 +385,13 @@ def test_near_silent_capture_is_flagged_not_described_as_a_result():
 
 def test_normal_level_audio_is_not_flagged(ping):
     assert "low_level" not in analysis.describe(ping, SR)
+
+
+def test_port_tools_are_registered():
+    """Only one process can hold the MIDI port; handover must be explicit."""
+    from elektron_mcp.mcp_server.server import mcp
+
+    names = {t.name for t in asyncio.run(mcp.list_tools())}
+    for name in ("release_midi_port", "reconnect_midi_port",
+                 "midi_port_status"):
+        assert name in names, f"{name} not registered"

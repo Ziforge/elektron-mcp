@@ -17,6 +17,7 @@ from elektron_mcp.tools.audition_tool import register_audition_tools
 from elektron_mcp.tools.patch_tool import register_patch_tools
 from elektron_mcp.tools.learn_tool import register_learn_tools
 from elektron_mcp.rytm.data import RYTM_SECTIONS, RYTM_NOTES
+from elektron_mcp.tools.port_tool import register_port_tools
 
 
 # Initialize MCP and MIDI
@@ -47,6 +48,9 @@ register_learn_tools(mcp, midi)
 # Analog Rytm MKII: same batch-tool machinery over its own parameter map.
 # Tracks are MIDI channels 1-12, FX is channel 13, performance macros are 14.
 register_section_tools(mcp, midi, RYTM_SECTIONS, RYTM_NOTES)
+
+# Hand the MIDI port over to Elektroid/Transfer without stopping the server.
+register_port_tools(mcp, midi)
 
 # Export the configured MCP server
 __all__ = ["mcp"]
