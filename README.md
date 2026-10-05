@@ -41,6 +41,57 @@ Only Wavetone machine is supported for now, other machines will be added soon, s
 - [x] Type-safe parameter validation using Pydantic
 - [x] Modular architecture for easy extension to other Elektron devices
 
+## Fork additions
+
+This fork extends upstream from one machine to the whole instrument, and adds
+a closed sound-design loop.
+
+**Full parameter coverage.** All 184 parameters are reachable: FM Drum, FM
+Tone, Swarmer and Wavetone, all seven filter types, amp, fx and LFO 1-3.
+Each section gets one batch tool (`set_fm_drum(track, gran=78, nlev=110)`)
+generated from the parameter maps, so a patch is one call rather than thirty.
+Values can be given as raw MIDI or in device units (`units="display"` turns
+`tune=24` into +24 semitones), optionally over 14-bit NRPN.
+
+**It can hear itself.** The Digitone II is a 2-channel USB audio input, so
+`audition` triggers a note, captures the result and returns descriptors --
+spectral centroid, band energies, spectral flatness (noise versus tone), T20
+decay, onset count. `score_against_reference` scores a patch against a WAV
+using a multi-resolution log-STFT distance, which makes automated patch
+matching possible.
+
+**Playback.** `play_note`, `hold_note`/`release_note`, `play_sequence` (with
+optional per-step parameter jitter), `all_notes_off`, `set_program`. Upstream
+had no way to trigger a note at all.
+
+**Patches.** `snapshot_patch`, `recall_patch`, `diff_patches`,
+`morph_patches`, `mutate_patch`. These work from what the server has sent,
+since the Digitone does not report values back.
+
+**MIDI learn.** `start_midi_capture` / `get_captured_midi` report which CC or
+NRPN a control emits, mapped back to the parameter maps. Needs `Send CC/NRPN`
+enabled in the Digitone's MIDI config.
+
+### Known limits
+
+- Machine selection has no MIDI CC, so choosing FM DRUM on a track is a
+  manual step on the device.
+- Patch snapshots cover what this server sent, not anything changed on the
+  hardware.
+- LFO3's modulation destination enum is missing from the data maps (test
+  marked xfail); LFO1 and LFO2's are present but unverified against the manual.
+- Onset counting is reliable for percussive material and approximate for
+  sustained sounds.
+
+### Bugs fixed from upstream
+
+- FM Tone operator B's envelope used operator A's CC numbers (48-51), so
+  setting B silently moved A. Corrected to 52-55.
+- Nested parameters were registered only as groups, while the controllers
+  address them as `A.atk` -- every nested FM Tone setter raised.
+- The test suite asserted `nrpn_lsb` as a string after a refactor made it an
+  int; 22 of 24 tests were failing.
+
 ## Demo
 
 Watch Claude control the Elektron Digitone synthesizer in real-time:
