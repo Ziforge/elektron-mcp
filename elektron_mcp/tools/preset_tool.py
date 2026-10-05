@@ -12,10 +12,17 @@ because only one process can hold it.
 import contextlib
 from pathlib import Path
 
-from elektron_mcp.preset import elektroid
+from elektron_mcp.patches.store import TRACK_STATE
+from elektron_mcp.preset import elektroid, sound
 
 DEFAULT_BACKUP_DIR = Path.home() / ".elektron-mcp" / "device-backups"
 PRESET_FS = "preset-takt-ii"
+
+# An FM DRUM preset downloaded from the device, used as a header template.
+# The header is not understood, so it is templated rather than synthesised:
+# if it carries a checksum or length field, reusing a real one keeps it valid.
+DEFAULT_TEMPLATE = (Path.home() / ".elektron-mcp" / "calibration" /
+                    "download" / "CALIB1.dn2pst")
 PROJECT_FS = "project"
 
 
@@ -185,6 +192,110 @@ def register_preset_tools(mcp, midi):
             return {"error": str(e)}
         return {"copied": source_slot, "to": dest_slot,
                 "output": out.strip() or None}
+
+    @mcp.tool()
+    def export_preset_file(
+        name: str,
+        track: int = 14,
+        dest: str | None = None,
+        tags: list[str] | None = None,
+        template: str | None = None,
+    ) -> dict:
+        """
+        Build a preset file from a track's current parameter values.
+
+        Writes a .dn2pst locally without touching the device, so the result
+        can be inspected or version-controlled before being uploaded.
+
+        Values come from what this server has sent to the track, so set the
+        parameters first. Only FM DRUM is calibrated; other machines store
+        their parameters in a different order and are not supported yet.
+
+        Args:
+            name (str): Preset name, as it will appear on the device.
+            track (int): Track whose tracked values to use, 1-16.
+            dest (str): Output path. Defaults to the backup directory.
+            tags (list[str]): Optional tags, e.g. ['PERCUSSION'].
+            template (str): Preset file to take the header from.
+
+        Returns:
+            dict: Where it was written and which parameters it carries.
+        """
+        state = TRACK_STATE.get(track)
+        values = state.get("fm_drum", {})
+        if not values:
+            return {
+                "error": f"no fm_drum values tracked for track {track}; set "
+                "parameters first, or recall a patch"
+            }
+
+        tpl = Path(template) if template else DEFAULT_TEMPLATE
+        if not tpl.is_file():
+            return {
+                "error": f"no template preset at {tpl}. Download an FM DRUM "
+                "preset from the device first -- the header is templated "
+                "rather than synthesised."
+            }
+
+        target = Path(dest) if dest else (
+            DEFAULT_BACKUP_DIR / "built" / f"{name}.dn2pst")
+        try:
+            result = sound.build_from_template(tpl, values, name, target, tags)
+        except sound.PresetError as e:
+            return {"error": str(e)}
+        result["note"] = (
+            "built locally; upload_preset sends it to the device. The header "
+            "is copied from the template and has not been decoded."
+        )
+        return result
+
+    @mcp.tool()
+    def save_current_as_preset(
+        name: str,
+        slot: str,
+        track: int = 14,
+        tags: list[str] | None = None,
+        template: str | None = None,
+    ) -> dict:
+        """
+        Save a track's current sound to a preset slot on the device.
+
+        Builds a preset file from the tracked parameter values and uploads
+        it, with no interaction with the device. This is what makes saving
+        automatable: committing live parameter state has no MIDI equivalent,
+        but writing a preset file to a slot does.
+
+        Overwrites the target slot, so prefer an empty one.
+
+        Only FM DRUM is calibrated. The templated header has not been
+        decoded, so verify the result sounds right after saving.
+
+        Args:
+            name (str): Preset name as it will appear on the device.
+            slot (str): Destination slot, e.g. 'B/175'.
+            track (int): Track whose values to save, 1-16.
+            tags (list[str]): Optional tags.
+            template (str): Preset file to take the header from.
+
+        Returns:
+            dict: What was built and the result of uploading it.
+        """
+        built = export_preset_file(name, track, None, tags, template)
+        if "error" in built:
+            return built
+        try:
+            with _port_handover(midi):
+                index = elektroid.find_device("Digitone")
+                out = elektroid.upload(index, PRESET_FS, built["file"],
+                                       f"/{slot.lstrip('/')}")
+        except elektroid.ElektroidError as e:
+            return {"error": str(e), "built": built}
+        return {
+            "saved": name, "slot": slot, "built": built,
+            "output": out.strip() or None,
+            "note": "verify on the device: the preset header is templated "
+                    "and has not been decoded.",
+        }
 
     @mcp.tool()
     def backup_device_project(slot: str = "002",
