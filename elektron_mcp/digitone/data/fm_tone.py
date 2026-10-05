@@ -126,9 +126,9 @@ FM_TONE_PARAMS = {
         },
         "B": {
             "atk": {
-                "cc_msb": 48,
+                "cc_msb": 52,
                 "nrpn_lsb": "1",
-                "nrpn_msb": 81,
+                "nrpn_msb": 85,
                 "max_midi": 127,
                 "min_midi": 0,
                 "max_val": 127,
@@ -136,9 +136,9 @@ FM_TONE_PARAMS = {
                 "default": 0,
             },
             "dec": {
-                "cc_msb": 49,
+                "cc_msb": 53,
                 "nrpn_lsb": "1",
-                "nrpn_msb": 82,
+                "nrpn_msb": 86,
                 "max_midi": 127,
                 "min_midi": 0,
                 "max_val": 127,
@@ -146,9 +146,9 @@ FM_TONE_PARAMS = {
                 "default": 32,
             },
             "end": {
-                "cc_msb": 50,
+                "cc_msb": 54,
                 "nrpn_lsb": "1",
-                "nrpn_msb": 83,
+                "nrpn_msb": 87,
                 "max_midi": 127,
                 "min_midi": 0,
                 "max_val": 127,
@@ -156,9 +156,9 @@ FM_TONE_PARAMS = {
                 "default": 127,
             },
             "lev": {
-                "cc_msb": 51,
+                "cc_msb": 55,
                 "nrpn_lsb": "1",
-                "nrpn_msb": 84,
+                "nrpn_msb": 88,
                 "max_midi": 127,
                 "min_midi": 0,
                 "max_val": 127,

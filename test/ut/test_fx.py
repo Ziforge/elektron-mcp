@@ -5,7 +5,7 @@ def test_fx_all_params():
     """Test all parameters in the FX page"""
     expected_params = {
         "BR": {
-            "midi": {"cc_msb": "78", "nrpn_lsb": "1", "nrpn_msb": "5"},
+            "midi": {"cc_msb": "78", "nrpn_lsb": 1, "nrpn_msb": 5},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -14,7 +14,7 @@ def test_fx_all_params():
             "options": None,
         },
         "OVER": {
-            "midi": {"cc_msb": "81", "nrpn_lsb": "1", "nrpn_msb": "8"},
+            "midi": {"cc_msb": "81", "nrpn_lsb": 1, "nrpn_msb": 8},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -23,7 +23,7 @@ def test_fx_all_params():
             "options": None,
         },
         "SRR": {
-            "midi": {"cc_msb": "79", "nrpn_lsb": "1", "nrpn_msb": "6"},
+            "midi": {"cc_msb": "79", "nrpn_lsb": 1, "nrpn_msb": 6},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -32,7 +32,7 @@ def test_fx_all_params():
             "options": None,
         },
         "SR.RT(pre/post)": {
-            "midi": {"cc_msb": "80", "nrpn_lsb": "1", "nrpn_msb": "7"},
+            "midi": {"cc_msb": "80", "nrpn_lsb": 1, "nrpn_msb": 7},
             "max_midi_value": 1,
             "min_midi_value": 0,
             "max_value": 1,
@@ -41,7 +41,7 @@ def test_fx_all_params():
             "options": ["pre", "post"],
         },
         "OD.RT(pre/post)": {
-            "midi": {"cc_msb": "82", "nrpn_lsb": "1", "nrpn_msb": "9"},
+            "midi": {"cc_msb": "82", "nrpn_lsb": 1, "nrpn_msb": 9},
             "max_midi_value": 1,
             "min_midi_value": 0,
             "max_value": 1,
@@ -50,7 +50,7 @@ def test_fx_all_params():
             "options": ["pre", "post"],
         },
         "DEL": {
-            "midi": {"cc_msb": "30", "nrpn_lsb": "1", "nrpn_msb": "36"},
+            "midi": {"cc_msb": "30", "nrpn_lsb": 1, "nrpn_msb": 36},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -59,7 +59,7 @@ def test_fx_all_params():
             "options": None,
         },
         "REV": {
-            "midi": {"cc_msb": "31", "nrpn_lsb": "1", "nrpn_msb": "37"},
+            "midi": {"cc_msb": "31", "nrpn_lsb": 1, "nrpn_msb": 37},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -68,7 +68,7 @@ def test_fx_all_params():
             "options": None,
         },
         "CHR": {
-            "midi": {"cc_msb": "29", "nrpn_lsb": "1", "nrpn_msb": "35"},
+            "midi": {"cc_msb": "29", "nrpn_lsb": 1, "nrpn_msb": 35},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,

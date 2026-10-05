@@ -5,7 +5,7 @@ def test_multi_mode_filter():
     """Test parameters in the multi-mode filter"""
     expected_params = {
         "ATK": {
-            "midi": {"cc_msb": "20", "nrpn_lsb": "1", "nrpn_msb": "16"},
+            "midi": {"cc_msb": "20", "nrpn_lsb": 1, "nrpn_msb": 16},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -13,7 +13,7 @@ def test_multi_mode_filter():
             "default_value": 0,
         },
         "DEC": {
-            "midi": {"cc_msb": "21", "nrpn_lsb": "1", "nrpn_msb": "17"},
+            "midi": {"cc_msb": "21", "nrpn_lsb": 1, "nrpn_msb": 17},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -21,7 +21,7 @@ def test_multi_mode_filter():
             "default_value": 64,
         },
         "SUS": {
-            "midi": {"cc_msb": "22", "nrpn_lsb": "1", "nrpn_msb": "18"},
+            "midi": {"cc_msb": "22", "nrpn_lsb": 1, "nrpn_msb": 18},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -29,7 +29,7 @@ def test_multi_mode_filter():
             "default_value": 0,
         },
         "REL": {
-            "midi": {"cc_msb": "23", "nrpn_lsb": "1", "nrpn_msb": "19"},
+            "midi": {"cc_msb": "23", "nrpn_lsb": 1, "nrpn_msb": 19},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -37,7 +37,7 @@ def test_multi_mode_filter():
             "default_value": 64,
         },
         "FREQ": {
-            "midi": {"cc_msb": "16", "nrpn_lsb": "1", "nrpn_msb": "20"},
+            "midi": {"cc_msb": "16", "nrpn_lsb": 1, "nrpn_msb": 20},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -45,7 +45,7 @@ def test_multi_mode_filter():
             "default_value": 127,
         },
         "RESO": {
-            "midi": {"cc_msb": "17", "nrpn_lsb": "1", "nrpn_msb": "21"},
+            "midi": {"cc_msb": "17", "nrpn_lsb": 1, "nrpn_msb": 21},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -53,7 +53,7 @@ def test_multi_mode_filter():
             "default_value": 0,
         },
         "TYPE": {
-            "midi": {"cc_msb": "18", "nrpn_lsb": "1", "nrpn_msb": "22"},
+            "midi": {"cc_msb": "18", "nrpn_lsb": 1, "nrpn_msb": 22},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -61,7 +61,7 @@ def test_multi_mode_filter():
             "default_value": 0,
         },
         "ENV.Depth": {
-            "midi": {"cc_msb": "24", "nrpn_lsb": "1", "nrpn_msb": "26"},
+            "midi": {"cc_msb": "24", "nrpn_lsb": 1, "nrpn_msb": 26},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 64,
@@ -114,7 +114,7 @@ def test_lowpass_4_filter():
     """Test parameters in the lowpass 4 filter"""
     expected_params = {
         "ATK": {
-            "midi": {"cc_msb": "20", "nrpn_lsb": "1", "nrpn_msb": "16"},
+            "midi": {"cc_msb": "20", "nrpn_lsb": 1, "nrpn_msb": 16},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -122,7 +122,7 @@ def test_lowpass_4_filter():
             "default_value": 0,
         },
         "DEC": {
-            "midi": {"cc_msb": "21", "nrpn_lsb": "1", "nrpn_msb": "17"},
+            "midi": {"cc_msb": "21", "nrpn_lsb": 1, "nrpn_msb": 17},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -130,7 +130,7 @@ def test_lowpass_4_filter():
             "default_value": 64,
         },
         "SUS": {
-            "midi": {"cc_msb": "22", "nrpn_lsb": "1", "nrpn_msb": "18"},
+            "midi": {"cc_msb": "22", "nrpn_lsb": 1, "nrpn_msb": 18},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -138,7 +138,7 @@ def test_lowpass_4_filter():
             "default_value": 0,
         },
         "REL": {
-            "midi": {"cc_msb": "23", "nrpn_lsb": "1", "nrpn_msb": "19"},
+            "midi": {"cc_msb": "23", "nrpn_lsb": 1, "nrpn_msb": 19},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -146,7 +146,7 @@ def test_lowpass_4_filter():
             "default_value": 64,
         },
         "FREQ": {
-            "midi": {"cc_msb": "16", "nrpn_lsb": "1", "nrpn_msb": "20"},
+            "midi": {"cc_msb": "16", "nrpn_lsb": 1, "nrpn_msb": 20},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -154,7 +154,7 @@ def test_lowpass_4_filter():
             "default_value": 127,
         },
         "RESO": {
-            "midi": {"cc_msb": "17", "nrpn_lsb": "1", "nrpn_msb": "21"},
+            "midi": {"cc_msb": "17", "nrpn_lsb": 1, "nrpn_msb": 21},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -162,7 +162,7 @@ def test_lowpass_4_filter():
             "default_value": 0,
         },
         "ENV.Depth": {
-            "midi": {"cc_msb": "24", "nrpn_lsb": "1", "nrpn_msb": "26"},
+            "midi": {"cc_msb": "24", "nrpn_lsb": 1, "nrpn_msb": 26},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 64,
@@ -215,7 +215,7 @@ def test_legacy_lp_hp_filter():
     """Test parameters in the legacy LP/HP filter"""
     expected_params = {
         "ATK": {
-            "midi": {"cc_msb": "20", "nrpn_lsb": "1", "nrpn_msb": "16"},
+            "midi": {"cc_msb": "20", "nrpn_lsb": 1, "nrpn_msb": 16},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -223,7 +223,7 @@ def test_legacy_lp_hp_filter():
             "default_value": 0,
         },
         "DEC": {
-            "midi": {"cc_msb": "21", "nrpn_lsb": "1", "nrpn_msb": "17"},
+            "midi": {"cc_msb": "21", "nrpn_lsb": 1, "nrpn_msb": 17},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -231,7 +231,7 @@ def test_legacy_lp_hp_filter():
             "default_value": 64,
         },
         "SUS": {
-            "midi": {"cc_msb": "22", "nrpn_lsb": "1", "nrpn_msb": "18"},
+            "midi": {"cc_msb": "22", "nrpn_lsb": 1, "nrpn_msb": 18},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -239,7 +239,7 @@ def test_legacy_lp_hp_filter():
             "default_value": 0,
         },
         "REL": {
-            "midi": {"cc_msb": "23", "nrpn_lsb": "1", "nrpn_msb": "19"},
+            "midi": {"cc_msb": "23", "nrpn_lsb": 1, "nrpn_msb": 19},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -247,7 +247,7 @@ def test_legacy_lp_hp_filter():
             "default_value": 64,
         },
         "FREQ": {
-            "midi": {"cc_msb": "16", "nrpn_lsb": "1", "nrpn_msb": "20"},
+            "midi": {"cc_msb": "16", "nrpn_lsb": 1, "nrpn_msb": 20},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -255,7 +255,7 @@ def test_legacy_lp_hp_filter():
             "default_value": 0,
         },
         "RESO": {
-            "midi": {"cc_msb": "17", "nrpn_lsb": "1", "nrpn_msb": "21"},
+            "midi": {"cc_msb": "17", "nrpn_lsb": 1, "nrpn_msb": 21},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -263,7 +263,7 @@ def test_legacy_lp_hp_filter():
             "default_value": 0,
         },
         "TYPE(lowpass/highpass)": {
-            "midi": {"cc_msb": "18", "nrpn_lsb": "1", "nrpn_msb": "22"},
+            "midi": {"cc_msb": "18", "nrpn_lsb": 1, "nrpn_msb": 22},
             "max_midi_value": 2,
             "min_midi_value": 0,
             "max_value": 127,
@@ -272,7 +272,7 @@ def test_legacy_lp_hp_filter():
             "options": ["lowpass", "highpass", "off"],
         },
         "ENV.Depth": {
-            "midi": {"cc_msb": "24", "nrpn_lsb": "1", "nrpn_msb": "26"},
+            "midi": {"cc_msb": "24", "nrpn_lsb": 1, "nrpn_msb": 26},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 64,
@@ -329,7 +329,7 @@ def test_comb_minus_filter():
     """Test parameters in the comb minus filter"""
     expected_params = {
         "ATK": {
-            "midi": {"cc_msb": "20", "nrpn_lsb": "1", "nrpn_msb": "16"},
+            "midi": {"cc_msb": "20", "nrpn_lsb": 1, "nrpn_msb": 16},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -337,7 +337,7 @@ def test_comb_minus_filter():
             "default_value": 0,
         },
         "DEC": {
-            "midi": {"cc_msb": "21", "nrpn_lsb": "1", "nrpn_msb": "17"},
+            "midi": {"cc_msb": "21", "nrpn_lsb": 1, "nrpn_msb": 17},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -345,7 +345,7 @@ def test_comb_minus_filter():
             "default_value": 64,
         },
         "SUS": {
-            "midi": {"cc_msb": "22", "nrpn_lsb": "1", "nrpn_msb": "18"},
+            "midi": {"cc_msb": "22", "nrpn_lsb": 1, "nrpn_msb": 18},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -353,7 +353,7 @@ def test_comb_minus_filter():
             "default_value": 0,
         },
         "REL": {
-            "midi": {"cc_msb": "23", "nrpn_lsb": "1", "nrpn_msb": "19"},
+            "midi": {"cc_msb": "23", "nrpn_lsb": 1, "nrpn_msb": 19},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -361,7 +361,7 @@ def test_comb_minus_filter():
             "default_value": 64,
         },
         "FREQ": {
-            "midi": {"cc_msb": "16", "nrpn_lsb": "1", "nrpn_msb": "20"},
+            "midi": {"cc_msb": "16", "nrpn_lsb": 1, "nrpn_msb": 20},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -369,7 +369,7 @@ def test_comb_minus_filter():
             "default_value": 127,
         },
         "FDBK": {
-            "midi": {"cc_msb": "17", "nrpn_lsb": "1", "nrpn_msb": "21"},
+            "midi": {"cc_msb": "17", "nrpn_lsb": 1, "nrpn_msb": 21},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -377,7 +377,7 @@ def test_comb_minus_filter():
             "default_value": 0,
         },
         "LPF": {
-            "midi": {"cc_msb": "18", "nrpn_lsb": "1", "nrpn_msb": "22"},
+            "midi": {"cc_msb": "18", "nrpn_lsb": 1, "nrpn_msb": 22},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -385,7 +385,7 @@ def test_comb_minus_filter():
             "default_value": 127,
         },
         "ENV.Depth": {
-            "midi": {"cc_msb": "24", "nrpn_lsb": "1", "nrpn_msb": "26"},
+            "midi": {"cc_msb": "24", "nrpn_lsb": 1, "nrpn_msb": 26},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 64,
@@ -438,7 +438,7 @@ def test_comb_plus_filter():
     """Test parameters in the comb plus filter"""
     expected_params = {
         "ATK": {
-            "midi": {"cc_msb": "20", "nrpn_lsb": "1", "nrpn_msb": "16"},
+            "midi": {"cc_msb": "20", "nrpn_lsb": 1, "nrpn_msb": 16},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -446,7 +446,7 @@ def test_comb_plus_filter():
             "default_value": 0,
         },
         "DEC": {
-            "midi": {"cc_msb": "21", "nrpn_lsb": "1", "nrpn_msb": "17"},
+            "midi": {"cc_msb": "21", "nrpn_lsb": 1, "nrpn_msb": 17},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -454,7 +454,7 @@ def test_comb_plus_filter():
             "default_value": 64,
         },
         "SUS": {
-            "midi": {"cc_msb": "22", "nrpn_lsb": "1", "nrpn_msb": "18"},
+            "midi": {"cc_msb": "22", "nrpn_lsb": 1, "nrpn_msb": 18},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -462,7 +462,7 @@ def test_comb_plus_filter():
             "default_value": 0,
         },
         "REL": {
-            "midi": {"cc_msb": "23", "nrpn_lsb": "1", "nrpn_msb": "19"},
+            "midi": {"cc_msb": "23", "nrpn_lsb": 1, "nrpn_msb": 19},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -470,7 +470,7 @@ def test_comb_plus_filter():
             "default_value": 64,
         },
         "FREQ": {
-            "midi": {"cc_msb": "16", "nrpn_lsb": "1", "nrpn_msb": "20"},
+            "midi": {"cc_msb": "16", "nrpn_lsb": 1, "nrpn_msb": 20},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -478,7 +478,7 @@ def test_comb_plus_filter():
             "default_value": 127,
         },
         "FDBK": {
-            "midi": {"cc_msb": "17", "nrpn_lsb": "1", "nrpn_msb": "21"},
+            "midi": {"cc_msb": "17", "nrpn_lsb": 1, "nrpn_msb": 21},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -486,7 +486,7 @@ def test_comb_plus_filter():
             "default_value": 0,
         },
         "LPF": {
-            "midi": {"cc_msb": "18", "nrpn_lsb": "1", "nrpn_msb": "22"},
+            "midi": {"cc_msb": "18", "nrpn_lsb": 1, "nrpn_msb": 22},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -494,7 +494,7 @@ def test_comb_plus_filter():
             "default_value": 127,
         },
         "ENV.Depth": {
-            "midi": {"cc_msb": "24", "nrpn_lsb": "1", "nrpn_msb": "26"},
+            "midi": {"cc_msb": "24", "nrpn_lsb": 1, "nrpn_msb": 26},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 64,
@@ -547,7 +547,7 @@ def test_equalizer_filter():
     """Test parameters in the equalizer filter"""
     expected_params = {
         "ATK": {
-            "midi": {"cc_msb": "20", "nrpn_lsb": "1", "nrpn_msb": "16"},
+            "midi": {"cc_msb": "20", "nrpn_lsb": 1, "nrpn_msb": 16},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -555,7 +555,7 @@ def test_equalizer_filter():
             "default_value": 0,
         },
         "DEC": {
-            "midi": {"cc_msb": "21", "nrpn_lsb": "1", "nrpn_msb": "17"},
+            "midi": {"cc_msb": "21", "nrpn_lsb": 1, "nrpn_msb": 17},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -563,7 +563,7 @@ def test_equalizer_filter():
             "default_value": 64,
         },
         "SUS": {
-            "midi": {"cc_msb": "22", "nrpn_lsb": "1", "nrpn_msb": "18"},
+            "midi": {"cc_msb": "22", "nrpn_lsb": 1, "nrpn_msb": 18},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -571,7 +571,7 @@ def test_equalizer_filter():
             "default_value": 0,
         },
         "REL": {
-            "midi": {"cc_msb": "23", "nrpn_lsb": "1", "nrpn_msb": "19"},
+            "midi": {"cc_msb": "23", "nrpn_lsb": 1, "nrpn_msb": 19},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -579,7 +579,7 @@ def test_equalizer_filter():
             "default_value": 64,
         },
         "FREQ": {
-            "midi": {"cc_msb": "16", "nrpn_lsb": "1", "nrpn_msb": "20"},
+            "midi": {"cc_msb": "16", "nrpn_lsb": 1, "nrpn_msb": 20},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -587,7 +587,7 @@ def test_equalizer_filter():
             "default_value": 127,
         },
         "GAIN": {
-            "midi": {"cc_msb": "17", "nrpn_lsb": "1", "nrpn_msb": "21"},
+            "midi": {"cc_msb": "17", "nrpn_lsb": 1, "nrpn_msb": 21},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -595,7 +595,7 @@ def test_equalizer_filter():
             "default_value": 0,
         },
         "Q": {
-            "midi": {"cc_msb": "18", "nrpn_lsb": "1", "nrpn_msb": "22"},
+            "midi": {"cc_msb": "18", "nrpn_lsb": 1, "nrpn_msb": 22},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -603,7 +603,7 @@ def test_equalizer_filter():
             "default_value": 0,
         },
         "ENV.Depth": {
-            "midi": {"cc_msb": "24", "nrpn_lsb": "1", "nrpn_msb": "26"},
+            "midi": {"cc_msb": "24", "nrpn_lsb": 1, "nrpn_msb": 26},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 64,
@@ -656,7 +656,7 @@ def test_base_width_filter():
     """Test parameters in the base/width filter"""
     expected_params = {
         "ENV.Delay": {
-            "midi": {"cc_msb": "19", "nrpn_lsb": "1", "nrpn_msb": "23"},
+            "midi": {"cc_msb": "19", "nrpn_lsb": 1, "nrpn_msb": 23},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -664,7 +664,7 @@ def test_base_width_filter():
             "default_value": 0,
         },
         "KEY.Tracking": {
-            "midi": {"cc_msb": "26", "nrpn_lsb": "1", "nrpn_msb": "69"},
+            "midi": {"cc_msb": "26", "nrpn_lsb": 1, "nrpn_msb": 69},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -672,7 +672,7 @@ def test_base_width_filter():
             "default_value": 0,
         },
         "BASE": {
-            "midi": {"cc_msb": "27", "nrpn_lsb": "1", "nrpn_msb": "24"},
+            "midi": {"cc_msb": "27", "nrpn_lsb": 1, "nrpn_msb": 24},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -680,7 +680,7 @@ def test_base_width_filter():
             "default_value": 0,
         },
         "WDTH": {
-            "midi": {"cc_msb": "28", "nrpn_lsb": "1", "nrpn_msb": "25"},
+            "midi": {"cc_msb": "28", "nrpn_lsb": 1, "nrpn_msb": 25},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -688,7 +688,7 @@ def test_base_width_filter():
             "default_value": 0,
         },
         "Env Reset": {
-            "midi": {"cc_msb": "25", "nrpn_lsb": "1", "nrpn_msb": "68"},
+            "midi": {"cc_msb": "25", "nrpn_lsb": 1, "nrpn_msb": 68},
             "max_midi_value": 1,
             "min_midi_value": 0,
             "max_value": 127,

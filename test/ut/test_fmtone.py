@@ -5,7 +5,7 @@ def test_fmtone_page1_all_params():
     """Test all parameters in FMTONE page 1"""
     expected_params = {
         "ALGO": {
-            "midi": {"cc_msb": "40", "nrpn_lsb": "1", "nrpn_msb": "73"},
+            "midi": {"cc_msb": "40", "nrpn_lsb": 1, "nrpn_msb": 73},
             "max_midi_value": 7,
             "min_midi_value": 0,
             "max_value": 8,
@@ -14,7 +14,7 @@ def test_fmtone_page1_all_params():
             "options": None,
         },
         "C": {
-            "midi": {"cc_msb": "41", "nrpn_lsb": "1", "nrpn_msb": "74"},
+            "midi": {"cc_msb": "41", "nrpn_lsb": 1, "nrpn_msb": 74},
             "max_midi_value": 18,
             "min_midi_value": 0,
             "max_value": 16,
@@ -23,7 +23,7 @@ def test_fmtone_page1_all_params():
             "options": None,
         },
         "A": {
-            "midi": {"cc_msb": "42", "nrpn_lsb": "1", "nrpn_msb": "75"},
+            "midi": {"cc_msb": "42", "nrpn_lsb": 1, "nrpn_msb": 75},
             "max_midi_value": 35,
             "min_midi_value": 0,
             "max_value": 16,
@@ -32,7 +32,7 @@ def test_fmtone_page1_all_params():
             "options": None,
         },
         "B": {
-            "midi": {"cc_msb": "43", "nrpn_lsb": "1", "nrpn_msb": "76"},
+            "midi": {"cc_msb": "43", "nrpn_lsb": 1, "nrpn_msb": 76},
             "max_midi_value": 3,
             "min_midi_value": 0,
             "max_value": [16, 16],
@@ -41,7 +41,7 @@ def test_fmtone_page1_all_params():
             "options": None,
         },
         "HARM": {
-            "midi": {"cc_msb": "44", "nrpn_lsb": "1", "nrpn_msb": "77"},
+            "midi": {"cc_msb": "44", "nrpn_lsb": 1, "nrpn_msb": 77},
             "max_midi_value": 37,
             "min_midi_value": 90,
             "max_value": 26,
@@ -50,7 +50,7 @@ def test_fmtone_page1_all_params():
             "options": None,
         },
         "DTUN": {
-            "midi": {"cc_msb": "45", "nrpn_lsb": "1", "nrpn_msb": "78"},
+            "midi": {"cc_msb": "45", "nrpn_lsb": 1, "nrpn_msb": 78},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -59,7 +59,7 @@ def test_fmtone_page1_all_params():
             "options": None,
         },
         "FDBK": {
-            "midi": {"cc_msb": "46", "nrpn_lsb": "1", "nrpn_msb": "79"},
+            "midi": {"cc_msb": "46", "nrpn_lsb": 1, "nrpn_msb": 79},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -68,7 +68,7 @@ def test_fmtone_page1_all_params():
             "options": None,
         },
         "MIX": {
-            "midi": {"cc_msb": "47", "nrpn_lsb": "1", "nrpn_msb": "80"},
+            "midi": {"cc_msb": "47", "nrpn_lsb": 1, "nrpn_msb": 80},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 63,
@@ -112,10 +112,15 @@ def test_fmtone_page1_all_params():
             param.default_value == expected_values["default_value"]
         ), f"Mismatch in {param_name} default_value"
 
-    # Verify no extra parameters exist
-    assert set(actual_params.keys()) == set(
-        expected_params.keys()
-    ), "Extra parameters found"
+    # Verify no extra parameters exist.
+    # Nested groups are also registered under their dotted alias ("A" ->
+    # "A.atk"), which is what lets the controllers address them, so those
+    # aliases are expected alongside the group itself.
+    allowed = set(expected_params)
+    for name, expected in expected_params.items():
+        if "midi" not in expected:
+            allowed |= {f"{name}.{nested}" for nested in expected}
+    assert set(actual_params.keys()) == allowed, "Extra parameters found"
 
 
 def test_fmtone_page2_all_params():
@@ -123,7 +128,7 @@ def test_fmtone_page2_all_params():
     expected_params = {
         "A": {
             "atk": {
-                "midi": {"cc_msb": "48", "nrpn_lsb": "1", "nrpn_msb": "81"},
+                "midi": {"cc_msb": "48", "nrpn_lsb": 1, "nrpn_msb": 81},
                 "max_midi_value": 127,
                 "min_midi_value": 0,
                 "max_value": 127,
@@ -132,7 +137,7 @@ def test_fmtone_page2_all_params():
                 "options": None,
             },
             "dec": {
-                "midi": {"cc_msb": "49", "nrpn_lsb": "1", "nrpn_msb": "82"},
+                "midi": {"cc_msb": "49", "nrpn_lsb": 1, "nrpn_msb": 82},
                 "max_midi_value": 127,
                 "min_midi_value": 0,
                 "max_value": 127,
@@ -141,7 +146,7 @@ def test_fmtone_page2_all_params():
                 "options": None,
             },
             "end": {
-                "midi": {"cc_msb": "50", "nrpn_lsb": "1", "nrpn_msb": "83"},
+                "midi": {"cc_msb": "50", "nrpn_lsb": 1, "nrpn_msb": 83},
                 "max_midi_value": 127,
                 "min_midi_value": 0,
                 "max_value": 127,
@@ -150,7 +155,7 @@ def test_fmtone_page2_all_params():
                 "options": None,
             },
             "lev": {
-                "midi": {"cc_msb": "51", "nrpn_lsb": "1", "nrpn_msb": "84"},
+                "midi": {"cc_msb": "51", "nrpn_lsb": 1, "nrpn_msb": 84},
                 "max_midi_value": 127,
                 "min_midi_value": 0,
                 "max_value": 127,
@@ -161,7 +166,7 @@ def test_fmtone_page2_all_params():
         },
         "B": {
             "atk": {
-                "midi": {"cc_msb": "48", "nrpn_lsb": "1", "nrpn_msb": "81"},
+                "midi": {"cc_msb": "52", "nrpn_lsb": 1, "nrpn_msb": 85},
                 "max_midi_value": 127,
                 "min_midi_value": 0,
                 "max_value": 127,
@@ -170,7 +175,7 @@ def test_fmtone_page2_all_params():
                 "options": None,
             },
             "dec": {
-                "midi": {"cc_msb": "49", "nrpn_lsb": "1", "nrpn_msb": "82"},
+                "midi": {"cc_msb": "53", "nrpn_lsb": 1, "nrpn_msb": 86},
                 "max_midi_value": 127,
                 "min_midi_value": 0,
                 "max_value": 127,
@@ -179,7 +184,7 @@ def test_fmtone_page2_all_params():
                 "options": None,
             },
             "end": {
-                "midi": {"cc_msb": "50", "nrpn_lsb": "1", "nrpn_msb": "83"},
+                "midi": {"cc_msb": "54", "nrpn_lsb": 1, "nrpn_msb": 87},
                 "max_midi_value": 127,
                 "min_midi_value": 0,
                 "max_value": 127,
@@ -188,7 +193,7 @@ def test_fmtone_page2_all_params():
                 "options": None,
             },
             "lev": {
-                "midi": {"cc_msb": "51", "nrpn_lsb": "1", "nrpn_msb": "84"},
+                "midi": {"cc_msb": "55", "nrpn_lsb": 1, "nrpn_msb": 88},
                 "max_midi_value": 127,
                 "min_midi_value": 0,
                 "max_value": 127,
@@ -240,7 +245,12 @@ def test_fmtone_page2_all_params():
                 nested_param.default_value == nested_expected["default_value"]
             ), f"Mismatch in {param_name}.{nested_name} default_value"
 
-    # Verify no extra parameters exist
-    assert set(actual_params.keys()) == set(
-        expected_params.keys()
-    ), "Extra parameters found"
+    # Verify no extra parameters exist.
+    # Nested groups are also registered under their dotted alias ("A" ->
+    # "A.atk"), which is what lets the controllers address them, so those
+    # aliases are expected alongside the group itself.
+    allowed = set(expected_params)
+    for name, expected in expected_params.items():
+        if "midi" not in expected:
+            allowed |= {f"{name}.{nested}" for nested in expected}
+    assert set(actual_params.keys()) == allowed, "Extra parameters found"

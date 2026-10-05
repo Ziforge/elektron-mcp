@@ -5,7 +5,7 @@ def test_swarmer_page1_all_params():
     """Test all parameters in SWARMER page 1"""
     expected_params = {
         "TUNE": {
-            "midi": {"cc_msb": "40", "nrpn_lsb": "1", "nrpn_msb": "73"},
+            "midi": {"cc_msb": "40", "nrpn_lsb": 1, "nrpn_msb": 73},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 60,
@@ -14,7 +14,7 @@ def test_swarmer_page1_all_params():
             "options": None,
         },
         "SWRM": {
-            "midi": {"cc_msb": "41", "nrpn_lsb": "1", "nrpn_msb": "74"},
+            "midi": {"cc_msb": "41", "nrpn_lsb": 1, "nrpn_msb": 74},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 120,
@@ -23,7 +23,7 @@ def test_swarmer_page1_all_params():
             "options": None,
         },
         "DET": {
-            "midi": {"cc_msb": "42", "nrpn_lsb": "1", "nrpn_msb": "75"},
+            "midi": {"cc_msb": "42", "nrpn_lsb": 1, "nrpn_msb": 75},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -32,7 +32,7 @@ def test_swarmer_page1_all_params():
             "options": None,
         },
         "MIX": {
-            "midi": {"cc_msb": "43", "nrpn_lsb": "1", "nrpn_msb": "76"},
+            "midi": {"cc_msb": "43", "nrpn_lsb": 1, "nrpn_msb": 76},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -41,7 +41,7 @@ def test_swarmer_page1_all_params():
             "options": None,
         },
         "M.OCT": {
-            "midi": {"cc_msb": "44", "nrpn_lsb": "1", "nrpn_msb": "77"},
+            "midi": {"cc_msb": "44", "nrpn_lsb": 1, "nrpn_msb": 77},
             "max_midi_value": 2,
             "min_midi_value": 0,
             "max_value": 2,
@@ -50,7 +50,7 @@ def test_swarmer_page1_all_params():
             "options": None,
         },
         "MAIN": {
-            "midi": {"cc_msb": "45", "nrpn_lsb": "1", "nrpn_msb": "78"},
+            "midi": {"cc_msb": "45", "nrpn_lsb": 1, "nrpn_msb": 78},
             "max_midi_value": 120,
             "min_midi_value": 0,
             "max_value": 120,
@@ -59,7 +59,7 @@ def test_swarmer_page1_all_params():
             "options": None,
         },
         "ANIM": {
-            "midi": {"cc_msb": "46", "nrpn_lsb": "1", "nrpn_msb": "79"},
+            "midi": {"cc_msb": "46", "nrpn_lsb": 1, "nrpn_msb": 79},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -68,7 +68,7 @@ def test_swarmer_page1_all_params():
             "options": None,
         },
         "N.MOD": {
-            "midi": {"cc_msb": "47", "nrpn_lsb": "1", "nrpn_msb": "80"},
+            "midi": {"cc_msb": "47", "nrpn_lsb": 1, "nrpn_msb": 80},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,

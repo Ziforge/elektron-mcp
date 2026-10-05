@@ -5,7 +5,7 @@ def test_wavetone_page1_all_params():
     """Test all parameters in WAVETONE page 1"""
     expected_params = {
         "TUN1": {
-            "midi": {"cc_msb": "40", "nrpn_lsb": "1", "nrpn_msb": "73"},
+            "midi": {"cc_msb": "40", "nrpn_lsb": 1, "nrpn_msb": 73},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 5,
@@ -14,7 +14,7 @@ def test_wavetone_page1_all_params():
             "options": None,
         },
         "WAV1": {
-            "midi": {"cc_msb": "41", "nrpn_lsb": "1", "nrpn_msb": "74"},
+            "midi": {"cc_msb": "41", "nrpn_lsb": 1, "nrpn_msb": 74},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 120,
@@ -23,7 +23,7 @@ def test_wavetone_page1_all_params():
             "options": None,
         },
         "PD1": {
-            "midi": {"cc_msb": "42", "nrpn_lsb": "1", "nrpn_msb": "75"},
+            "midi": {"cc_msb": "42", "nrpn_lsb": 1, "nrpn_msb": 75},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 100,
@@ -32,7 +32,7 @@ def test_wavetone_page1_all_params():
             "options": None,
         },
         "LEV1": {
-            "midi": {"cc_msb": "43", "nrpn_lsb": "1", "nrpn_msb": "76"},
+            "midi": {"cc_msb": "43", "nrpn_lsb": 1, "nrpn_msb": 76},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -41,7 +41,7 @@ def test_wavetone_page1_all_params():
             "options": None,
         },
         "TUN2": {
-            "midi": {"cc_msb": "44", "nrpn_lsb": "1", "nrpn_msb": "77"},
+            "midi": {"cc_msb": "44", "nrpn_lsb": 1, "nrpn_msb": 77},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 5,
@@ -50,7 +50,7 @@ def test_wavetone_page1_all_params():
             "options": None,
         },
         "WAV2": {
-            "midi": {"cc_msb": "45", "nrpn_lsb": "1", "nrpn_msb": "78"},
+            "midi": {"cc_msb": "45", "nrpn_lsb": 1, "nrpn_msb": 78},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 120,
@@ -59,7 +59,7 @@ def test_wavetone_page1_all_params():
             "options": None,
         },
         "PD2": {
-            "midi": {"cc_msb": "46", "nrpn_lsb": "1", "nrpn_msb": "79"},
+            "midi": {"cc_msb": "46", "nrpn_lsb": 1, "nrpn_msb": 79},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 100,
@@ -68,7 +68,7 @@ def test_wavetone_page1_all_params():
             "options": None,
         },
         "LEV2": {
-            "midi": {"cc_msb": "47", "nrpn_lsb": "1", "nrpn_msb": "80"},
+            "midi": {"cc_msb": "47", "nrpn_lsb": 1, "nrpn_msb": 80},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -126,7 +126,7 @@ def test_wavetone_page2_all_params():
     """Test all parameters in WAVETONE page 2"""
     expected_params = {
         "OFS1": {
-            "midi": {"cc_msb": "48", "nrpn_lsb": "1", "nrpn_msb": "81"},
+            "midi": {"cc_msb": "48", "nrpn_lsb": 1, "nrpn_msb": 81},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 10,
@@ -135,7 +135,7 @@ def test_wavetone_page2_all_params():
             "options": None,
         },
         "TBL1": {
-            "midi": {"cc_msb": "49", "nrpn_lsb": "1", "nrpn_msb": "82"},
+            "midi": {"cc_msb": "49", "nrpn_lsb": 1, "nrpn_msb": 82},
             "max_midi_value": 1,
             "min_midi_value": 0,
             "max_value": 1,
@@ -144,7 +144,7 @@ def test_wavetone_page2_all_params():
             "options": ["prim", "harm"],
         },
         "MOD": {
-            "midi": {"cc_msb": "50", "nrpn_lsb": "1", "nrpn_msb": "83"},
+            "midi": {"cc_msb": "50", "nrpn_lsb": 1, "nrpn_msb": 83},
             "max_midi_value": 3,
             "min_midi_value": 0,
             "max_value": 3,
@@ -153,7 +153,7 @@ def test_wavetone_page2_all_params():
             "options": ["off", "ring mod", "ring mod fixed", "hard sync"],
         },
         "RSET": {
-            "midi": {"cc_msb": "51", "nrpn_lsb": "1", "nrpn_msb": "84"},
+            "midi": {"cc_msb": "51", "nrpn_lsb": 1, "nrpn_msb": 84},
             "max_midi_value": 2,
             "min_midi_value": 0,
             "max_value": 2,
@@ -162,7 +162,7 @@ def test_wavetone_page2_all_params():
             "options": ["off", "on", "random"],
         },
         "OFS2": {
-            "midi": {"cc_msb": "52", "nrpn_lsb": "1", "nrpn_msb": "85"},
+            "midi": {"cc_msb": "52", "nrpn_lsb": 1, "nrpn_msb": 85},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 10,
@@ -171,7 +171,7 @@ def test_wavetone_page2_all_params():
             "options": None,
         },
         "TBL2": {
-            "midi": {"cc_msb": "53", "nrpn_lsb": "1", "nrpn_msb": "86"},
+            "midi": {"cc_msb": "53", "nrpn_lsb": 1, "nrpn_msb": 86},
             "max_midi_value": 1,
             "min_midi_value": 0,
             "max_value": 1,
@@ -180,7 +180,7 @@ def test_wavetone_page2_all_params():
             "options": ["prim", "harm"],
         },
         "DRIF": {
-            "midi": {"cc_msb": "55", "nrpn_lsb": "1", "nrpn_msb": "88"},
+            "midi": {"cc_msb": "55", "nrpn_lsb": 1, "nrpn_msb": 88},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -238,7 +238,7 @@ def test_wavetone_page3_all_params():
     """Test all parameters in WAVETONE page 3"""
     expected_params = {
         "ATK": {
-            "midi": {"cc_msb": "56", "nrpn_lsb": "1", "nrpn_msb": "89"},
+            "midi": {"cc_msb": "56", "nrpn_lsb": 1, "nrpn_msb": 89},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -247,7 +247,7 @@ def test_wavetone_page3_all_params():
             "options": None,
         },
         "HOLD": {
-            "midi": {"cc_msb": "57", "nrpn_lsb": "1", "nrpn_msb": "90"},
+            "midi": {"cc_msb": "57", "nrpn_lsb": 1, "nrpn_msb": 90},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -256,7 +256,7 @@ def test_wavetone_page3_all_params():
             "options": None,
         },
         "DEC": {
-            "midi": {"cc_msb": "58", "nrpn_lsb": "1", "nrpn_msb": "91"},
+            "midi": {"cc_msb": "58", "nrpn_lsb": 1, "nrpn_msb": 91},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -265,7 +265,7 @@ def test_wavetone_page3_all_params():
             "options": None,
         },
         "NLEV": {
-            "midi": {"cc_msb": "59", "nrpn_lsb": "1", "nrpn_msb": "92"},
+            "midi": {"cc_msb": "59", "nrpn_lsb": 1, "nrpn_msb": 92},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -274,7 +274,7 @@ def test_wavetone_page3_all_params():
             "options": None,
         },
         "BASE": {
-            "midi": {"cc_msb": "60", "nrpn_lsb": "1", "nrpn_msb": "93"},
+            "midi": {"cc_msb": "60", "nrpn_lsb": 1, "nrpn_msb": 93},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -283,7 +283,7 @@ def test_wavetone_page3_all_params():
             "options": None,
         },
         "WDTH": {
-            "midi": {"cc_msb": "61", "nrpn_lsb": "1", "nrpn_msb": "94"},
+            "midi": {"cc_msb": "61", "nrpn_lsb": 1, "nrpn_msb": 94},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -292,7 +292,7 @@ def test_wavetone_page3_all_params():
             "options": None,
         },
         "TYPE": {
-            "midi": {"cc_msb": "62", "nrpn_lsb": "1", "nrpn_msb": "95"},
+            "midi": {"cc_msb": "62", "nrpn_lsb": 1, "nrpn_msb": 95},
             "max_midi_value": 2,
             "min_midi_value": 0,
             "max_value": 2,
@@ -301,7 +301,7 @@ def test_wavetone_page3_all_params():
             "options": ["grain nose", "tuned noise", "sample and hold noise"],
         },
         "CHAR": {
-            "midi": {"cc_msb": "63", "nrpn_lsb": "1", "nrpn_msb": "96"},
+            "midi": {"cc_msb": "63", "nrpn_lsb": 1, "nrpn_msb": 96},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,

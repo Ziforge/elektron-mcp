@@ -84,11 +84,17 @@ def create_parameter_group(params_dict):
             # This is a parameter definition
             parameters[key] = create_param_from_dict(value)
         elif isinstance(value, dict):
-            # This is a nested dictionary of parameters
+            # This is a nested dictionary of parameters (e.g. page_2 "A" holding
+            # atk/dec/end/lev for operator A).
             nested_params = {}
             for nested_key, nested_value in value.items():
                 nested_params[nested_key] = create_param_from_dict(nested_value)
             parameters[key] = nested_params
+            # Controllers address these as "A.atk", so register the dotted form
+            # alongside the nested group. Without this every nested setter
+            # raises "Invalid parameter".
+            for nested_key, nested_param in nested_params.items():
+                parameters[f"{key}.{nested_key}"] = nested_param
     return ParameterGroup(parameters=parameters)
 
 
