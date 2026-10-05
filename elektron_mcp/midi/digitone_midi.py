@@ -99,7 +99,17 @@ class DigitoneMIDI:
             return False
 
     def disconnect(self) -> None:
-        """Close all MIDI connections."""
+        """Close all MIDI connections.
+
+        Stops any running capture first. Closing the input port ends the
+        capture thread's loop regardless, so without this the flag would stay
+        set and the capture tools would report that they were still listening
+        when nothing was.
+        """
+        if self._capturing:
+            logger.info("Stopping MIDI capture before disconnecting")
+            self.stop_capture()
+
         if self.input_port:
             self.input_port.close()
             self.input_port = None

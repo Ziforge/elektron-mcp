@@ -29,13 +29,25 @@ def register_port_tools(mcp, midi):
         name = midi.output_port_name
         if not midi.connected:
             return {"released": False, "note": "no port was open"}
+
+        # Releasing the port ends any capture, so say so rather than leaving
+        # the caller believing a capture survived the handover.
+        was_capturing = midi._capturing
         midi.disconnect()
-        return {
+
+        result = {
             "released": True,
             "port": name,
             "note": "parameter and note tools are inert until "
             "reconnect_midi_port is called",
         }
+        if was_capturing:
+            result["capture_stopped"] = True
+            result["capture_note"] = (
+                "an active MIDI capture was stopped by releasing the port; "
+                "call start_midi_capture again after reconnecting"
+            )
+        return result
 
     @mcp.tool()
     def reconnect_midi_port(port_name: str | None = None) -> dict:

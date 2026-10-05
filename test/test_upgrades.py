@@ -395,3 +395,24 @@ def test_port_tools_are_registered():
     for name in ("release_midi_port", "reconnect_midi_port",
                  "midi_port_status"):
         assert name in names, f"{name} not registered"
+
+
+def test_releasing_the_port_stops_an_active_capture():
+    """Regression: releasing the port closed the input, which silently ended
+    the capture thread, while the capturing flag stayed set -- so the capture
+    tools reported they were listening when nothing was."""
+    from elektron_mcp.midi.digitone_midi import DigitoneMIDI
+
+    midi = DigitoneMIDI.__new__(DigitoneMIDI)
+    midi.input_port = None
+    midi.output_port = None
+    midi.connected = True
+    midi.output_port_name = "Fake"
+    midi._captured = []
+    midi._capturing = True
+    midi._capture_thread = None
+
+    midi.disconnect()
+
+    assert midi._capturing is False, "capture flag survived disconnect"
+    assert midi.connected is False
