@@ -47,7 +47,28 @@ def test_every_rytm_parameter_is_reachable():
 
 
 def test_rytm_parameter_total_is_stable():
-    assert sum(len(p) for p in RYTM_SECTIONS.values()) == 96
+    """96 originally, plus the three trig parameters -- note, velocity and
+    length, CC 3 to 5 -- that Appendix C of the manual lists and the
+    transcription from the .cki files had missed."""
+    assert sum(len(p) for p in RYTM_SECTIONS.values()) == 99
+
+
+def test_trig_parameters_cover_note_velocity_and_length():
+    """Without these a sequencer can shape a track but not play it."""
+    trig = RYTM_SECTIONS["rytm_trig"]
+    assert [trig[k]["cc_msb"] for k in ("note", "velocity", "length")] \
+        == [3, 4, 5]
+
+
+def test_lfo_depth_is_the_one_high_resolution_parameter():
+    """Appendix C.6: "the LFO depth is a high-resolution parameter, with CC
+    LSB value" -- CC 109 coarse, CC 118 fine. Nothing else on the Rytm
+    declares a CC LSB."""
+    lfo = RYTM_SECTIONS["rytm_lfo"]
+    assert lfo["depth"]["cc_lsb"] == 118
+    fine = [ident for section in RYTM_SECTIONS.values()
+            for ident, spec in section.items() if "cc_lsb" in spec]
+    assert fine == ["depth"]
 
 
 @pytest.mark.parametrize("section", sorted(RYTM_SECTIONS))

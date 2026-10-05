@@ -1,10 +1,15 @@
 """
 Analog Rytm MKII parameter map.
 
-Transcribed from the Cirklon instrument definitions in
+Originally transcribed from the Cirklon instrument definitions in
 github.com/Ziforge/CirklonSynthDefs (RytmMKII, RytmMKII-FX, RytmMKII-Perf),
-which are CC-only -- there are no NRPN numbers here, so the section tools
-degrade to CC when asked for NRPN.
+then checked against Appendix C of the Analog Rytm MKII manual, OS 1.74.
+The appendix confirmed every CC already here and added the three trig
+parameters below. The map is CC-only, so the section tools degrade to CC
+when asked for NRPN.
+
+The eight SYNTH CCs, 16 to 23, are machine-dependent: each machine names
+them differently. See rytm.machines for the per-machine names.
 
 Channel layout: the twelve drum tracks sit on MIDI channels 1-12, the FX
 block on channel 13 and the performance macros on channel 14. The sections
@@ -77,7 +82,9 @@ RYTM_LFO = {
     "wave": _p(106, "LfoWav"),
     "start_phase": _p(107, "LfoStr"),
     "trig_mode": _p(108, "LfoTrg"),
-    "depth": _p(109, "LfoDep"),
+    # The only high-resolution parameter on the Rytm: CC 109 is the coarse
+    # half, CC 118 the fine one.
+    "depth": _p(109, "LfoDep", cc_lsb=118),
 }
 
 RYTM_TRACK = {
@@ -87,7 +94,12 @@ RYTM_TRACK = {
     "active_scene": _p(92, "ActScn"),
 }
 
+# CC 3, 4 and 5 carry the trig's own note, velocity and length, which is
+# how a sequencer plays a track rather than just shaping its sound.
 RYTM_TRIG = {
+    "note": _p(3, "Note"),
+    "velocity": _p(4, "Vel"),
+    "length": _p(5, "Length"),
     "syn_trig": _p(11, "SynTrg"),
     "smp_trig": _p(12, "SmpTrg"),
     "env_trig": _p(13, "EnvTrg"),
@@ -101,7 +113,10 @@ RYTM_EUCLID = {
     "rot_gen_a": _p(89, "RotGen"),
     "rot_gen_b": _p(90, "RotGen"),
     "track_rotation": _p(91, "TrkRot"),
-    "euclid_on": _p(117, "EucOn"),
+    # The committed .cki truncates "EucOn/Off" to six characters
+    # as "EucOn/"; keep that on the Cirklon, and the cleaner
+    # form in the tools.
+    "euclid_on": _p(117, "EucOn", cki_label="EucOn/"),
 }
 
 # --- FX block, MIDI channel 13 ---------------------------------------------
