@@ -534,16 +534,17 @@ def capture(device, audio_device, seconds, window=None, attempts=3,
 
 
 def measure_noise_floor(device, sections, patch, audio_device, seconds,
-                        repeats, window=None):
+                        repeats, window=None, keep=0.7):
     """How much two recordings of the same patch differ, on both measures."""
     device.send_patch(sections, patch)
-    ref, sr = capture(device, audio_device, seconds, window)
+    ref, sr = capture(device, audio_device, seconds, window, keep=keep)
     ref_desc = describe(ref, sr)
     distances, balances = [], []
     wander = {}
     for _ in range(repeats):
         device.send_patch(sections, patch)
-        again, _ = capture(device, audio_device, seconds, window)
+        again, _ = capture(device, audio_device, seconds, window,
+                           keep=keep)
         distances.append(mstft_distance(ref, again, sr)["distance"])
         balances.append(abs(balance(again) - balance(ref)))
         for label, delta in descriptor_deltas(ref_desc,
@@ -603,6 +604,11 @@ def main():
     ap.add_argument("--velocity", type=int, default=100)
     ap.add_argument("--gate-ms", type=int, default=400)
     ap.add_argument("--seconds", type=float, default=1.2)
+    ap.add_argument("--keep", type=float, default=0.7,
+                    help="how much of the note to analyse after its onset. "
+                         "The default suits a struck note; a send effect "
+                         "needs most of the recording, since what it does "
+                         "happens after the note")
     ap.add_argument("--noise-repeats", type=int, default=8)
     ap.add_argument("--sigma", type=float, default=5.0,
                     help="how many noise deviations counts as a change")
@@ -708,7 +714,7 @@ def main():
         print("measuring the noise floor...")
         ref, sr, floor, bal_floor, wander = measure_noise_floor(
             device, sections, patch, args.audio_device, args.seconds,
-            args.noise_repeats, window)
+            args.noise_repeats, window, args.keep)
         if max(abs(ref).max(), 0) < 1e-4:
             print("  the capture is silent -- check the track is audible "
                   "and the audio input is the device")
@@ -784,15 +790,30 @@ def main():
                 d = mstft_distance(ref, probe, sr)["distance"]
                 shift = abs(balance(probe) - ref_balance)
                 moved = changed_descriptors(ref_desc,
-                                            describe(probe, sr))
+                                            describe(probe, sr),
+                                            desc_thresholds)
+                # Accumulated across every probe value, not taken from
+                # whichever moved the spectrum most: a parameter can leave
+                # the spectral shape alone at one end and change the level
+                # at the other.
+                for label, delta in moved.items():
+                    best_moved[label] = max(best_moved.get(label, 0.0),
+                                            delta)
                 if d > best:
-                    best, best_value, best_moved = d, value, moved
+                    best, best_value = d, value
                 best_bal = max(best_bal, shift)
-            spectral = best > threshold
+            spectral = spectral_usable and best > threshold
             stereo = best_bal > bal_threshold
-            verdict = "RESPONDS" if spectral or stereo else "INCONCLUSIVE"
-            how = "spectrum" if spectral else ("stereo" if stereo
-                                               else "")
+            # A descriptor moving past its own measured floor is evidence
+            # in its own right. The spectral distance is RMS-normalised and
+            # so cannot see a level change at all, which is most of what a
+            # send or a makeup gain does.
+            descriptive = bool(best_moved)
+            verdict = ("RESPONDS" if spectral or stereo or descriptive
+                       else "INCONCLUSIVE")
+            how = ("spectrum" if spectral else
+                   "stereo" if stereo else
+                   "descriptors" if descriptive else "")
             if stereo and "position" not in best_moved:
                 best_moved["position"] = round(best_bal, 3)
             results.append({

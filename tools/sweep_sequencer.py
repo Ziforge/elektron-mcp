@@ -32,7 +32,7 @@ from rig_audio.analysis import describe, mstft_distance      # noqa: E402
 from elektron_mcp.digitone.data.sections import SECTIONS     # noqa: E402
 
 from tools.sweep_device import (                             # noqa: E402
-    acquire_lock, cc_of, nrpn_of, release_lock,
+    acquire_lock, align, cc_of, nrpn_of, release_lock,
 )
 from rig_audio.capture import SubprocessRecorder             # noqa: E402
 
@@ -46,11 +46,11 @@ class Clock(threading.Thread):
         super().__init__(daemon=True)
         self.port = port
         self.interval = 60.0 / (bpm * 24)
-        self._stop = threading.Event()
+        self._stopping = threading.Event()
 
     def run(self):
         nxt = time.perf_counter()
-        while not self._stop.is_set():
+        while not self._stopping.is_set():
             nxt += self.interval
             delay = nxt - time.perf_counter()
             if delay > 0:
@@ -61,7 +61,9 @@ class Clock(threading.Thread):
                 return
 
     def stop(self):
-        self._stop.set()
+        # Named _stopping, not _stop: threading.Thread already has a
+        # _stop() method, and shadowing it makes join() raise.
+        self._stopping.set()
         self.join(timeout=1.0)
 
 
@@ -87,10 +89,31 @@ def main():
     clock = Clock(port, args.bpm)
 
     def capture_bars():
+        """Record from the top of the pattern, every time.
+
+        Starting the recorder at an arbitrary moment catches a different
+        slice of the loop each pass, which put the bar-to-bar floor at 2.11
+        -- a sequencer repeats, but only if the same window of it is
+        recorded. Restarting transport first makes every capture begin at
+        step one, so two passes of an unchanged pattern are the same audio.
+        """
+        port.send(mido.Message("stop"))
+        for control in (123, 120):
+            port.send(mido.Message("control_change", channel=channel,
+                                   control=control, value=0))
+        time.sleep(0.25)
         rec = SubprocessRecorder(seconds=args.seconds,
                                  device=args.audio_device).start()
-        time.sleep(args.seconds * 0.9)
-        return rec.finish()
+        port.send(mido.Message("start"))
+        audio, samplerate = rec.finish()
+        port.send(mido.Message("stop"))
+        # Restarting transport fixes which part of the pattern is heard,
+        # but not exactly when: there is variable latency between the
+        # recorder opening and the device acting on the start message.
+        # Aligning on the pattern's first hit removes that, the same way
+        # the note-driven sweep does.
+        return (align(audio, samplerate, keep=args.seconds - 0.4),
+                samplerate)
 
     def set_param(spec, value):
         cc = cc_of(spec)
@@ -107,12 +130,62 @@ def main():
                                    control=control, value=int(data)))
             time.sleep(0.004)
 
+    # A voice that does not repeat itself cannot be measured. Track 14's
+    # patch leaves the oscillator phase unreset per trig, which is right
+    # for a sleigh bell and makes every hit different -- it put the
+    # bar-to-bar floor at 0.55, above anything a trig parameter moves. Phase
+    # reset on and modulation off makes the pattern deterministic without
+    # touching the parameters under test.
+    STABILISE = {
+        "fm_drum": {"nrst": 1},
+        "lfo1": {"dep": 0, "dest": 0},
+        "lfo2": {"dep": 0, "dest": 0},
+        "lfo3": {"dep": 0, "dest": 0},
+        "amp": {"env_rset": 1},
+    }
+
+    def stabilise():
+        isolate()
+        for section, values in STABILISE.items():
+            for ident, value in values.items():
+                spec = SECTIONS.get(section, {}).get(ident)
+                if spec is not None:
+                    set_param(spec, value)
+        time.sleep(0.15)
+
+    def isolate():
+        """Silence every other track, so the measurement is of this one.
+
+        The sequencer plays all tracks, and probing one track's parameters
+        against the variation of the whole mix left the floor at 0.55 --
+        above anything a trig parameter moves. The mute parameters would be
+        the natural tool and do not respond over MIDI at all, by CC or
+        NRPN, so amplitude volume does the job instead: it is verified, and
+        it is per track.
+        """
+        for other in range(1, 17):
+            if other == args.track:
+                continue
+            port.send(mido.Message("control_change", channel=other - 1,
+                                   control=90, value=0))
+            time.sleep(0.004)
+        time.sleep(0.1)
+
+    def restore_others():
+        for other in range(1, 17):
+            if other == args.track:
+                continue
+            port.send(mido.Message("control_change", channel=other - 1,
+                                   control=90, value=110))
+            time.sleep(0.004)
+
     try:
         print(f"starting the sequencer at {args.bpm:.0f} BPM")
         clock.start()
         port.send(mido.Message("start"))
         time.sleep(1.0)
 
+        stabilise()
         playing, sr = capture_bars()
         level = describe(playing, sr).get("rms") or 0.0
         print(f"  pattern level: rms {level:.5f}")
@@ -128,6 +201,7 @@ def main():
 
         floor = []
         for _ in range(args.repeats):
+            stabilise()
             again, _ = capture_bars()
             floor.append(mstft_distance(playing, again, sr)["distance"])
         mean = sum(floor) / len(floor)
@@ -149,6 +223,7 @@ def main():
                 best = 0.0
                 for value in (spec.get("max_midi", 127),
                               spec.get("min_midi", 0)):
+                    stabilise()
                     set_param(spec, value)
                     time.sleep(0.2)
                     probe, _ = capture_bars()
@@ -161,6 +236,7 @@ def main():
                       f"d={best:7.4f}  {verdict}")
     finally:
         clock.stop()
+        restore_others()
         port.send(mido.Message("stop"))
         for control in (123, 120):
             port.send(mido.Message("control_change", channel=channel,

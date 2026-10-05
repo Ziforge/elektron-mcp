@@ -8,29 +8,63 @@ measures whether the sound moved. `tools/merge_sweeps.py` combines passes.
 `tools/check_key_tracking.py` covers the one parameter a single-note sweep
 cannot reach.
 
-## Digitone II, track 14, FM DRUM + MULTI-MODE
+## Digitone II: 112 of 146 distinct addresses verified
 
-**81 of 84 parameters verified** across the machine, filter, amp, FX and all
-three LFOs.
+Counted by address rather than by parameter, because the machines share
+their CC numbers: an unverified machine parameter is usually an address
+already verified under another name. By parameter the figure is 112 of 244,
+which understates it for that reason.
 
 | section | verified |
 |---|---|
 | `fm_drum` | 30/30 |
+| `amp` | 9/9 |
 | `fx` | 8/8 |
 | `lfo1`, `lfo2`, `lfo3` | 8/8 each |
-| `filter_multi_mode` | 7/8 |
-| `amp` | 8/9 |
+| `filter_multi_mode` | 8/8 |
+| `send_delay` | 8/8 |
+| `send_reverb` | 7/7 |
+| `send_chorus` | 7/7 |
+| `master` | 1/1 |
 | `filter_base_width` | 4/5 |
+| `compressor` | 4/9 |
+| `trig` | 1/7 |
+| `track` | 1/2 |
 
-Not separated from the noise floor, all three with CC numbers confirmed
-against Appendix C of the manual:
+Reproduce with:
 
-- `amp.hold` — moves tonality but under threshold. Its effect overlaps the
-  decay stage in a way one captured note cannot separate.
-- `filter_multi_mode.rel` — the release stage, after the key is up.
-- `filter_base_width.env_reset` — resets the envelope on a *new* trig, so
-  by definition it needs two consecutive notes. A one-note probe cannot
-  show it.
+    uv run python tools/merge_sweeps.py <reports> --by-address
+
+### What is left, and why
+
+Only three of the 34 are open questions. The rest are unreachable by audio
+for structural reasons, not for want of effort:
+
+- **`external_in`, 11 addresses.** They control the external audio inputs
+  and nothing is plugged in. Correctly silent; this is the map being right,
+  not unverified.
+- **`trig` 6 and `euclid` 7.** Sequencer-domain: they govern what a
+  pattern plays, and an incoming MIDI note bypasses them. Driving the
+  device's own sequencer gets the pattern playing -- it does follow MIDI
+  transport -- but the bar-to-bar floor will not go below about 0.5, and
+  parameter locks are the likely reason: a p-lock overrides whatever CC
+  arrives, per step. Settling these means either editing the pattern or
+  reading the device's knob output.
+- **The two mutes, CC 94 and CC 110.** These do not respond over MIDI at
+  all, by CC or by NRPN 1:108, with every track muted and the pattern still
+  playing at full level. Both numbers are from Appendix C, so the map
+  matches the manual; the manual is not reproducible here. Recorded as a
+  discrepancy rather than a pending task.
+- **`compressor`, 5 addresses.** The compressor does not engage on the test
+  material, so its threshold, attack, release, ratio and sidechain source
+  have nothing to act on. Closable with a hotter, more sustained signal.
+- **CC 60 and 61.** Only FM TONE and WAVETONE reach these two slots and
+  track 14 runs FM DRUM; the machine cannot be set over MIDI. Track 1 does
+  respond on both -- d 1.85 and 1.78 -- but against a floor of 1.57, so
+  suggestive rather than settled. Closable on track 1 with a stabilised
+  patch.
+- **`filter_base_width.env_reset`.** Acts on a new trig by definition, so
+  it needs two notes in succession.
 
 ## What the CC numbers already cover
 
