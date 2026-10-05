@@ -65,6 +65,23 @@ against Appendix C of the manual:
   tonality and stereo position say whether a parameter did what its name
   implies. A mono-summed distance cannot see panning at all; `amp.pan`
   verifies only through the stereo measure.
+- **Measure each descriptor's floor too, don't assume it.** How far a
+  descriptor wanders between two recordings of the same patch depends
+  entirely on the material: a quiet decaying tail wanders far more than a
+  struck note. Fixed tolerances were a guess; measured ones let a
+  descriptor carry the verdict where the spectral distance cannot.
+- **Compare the part of the note the parameter acts on.** A filter's
+  release happens after the key is up and a hold stage only in the plateau
+  before decay, so comparing the whole note buries either in the noise.
+  `amp.hold` read 0.075 across the whole note and 0.440 windowed past the
+  transient -- which is identical either way and was doing nothing but
+  diluting the measurement.
+- **Some parameters need two notes.** An envelope reset only acts when a
+  new trig arrives, so a single-note probe cannot show it at all.
+- **Expect the audio device to refuse occasionally.** Polling for silence
+  opens it several thousand times across a sweep and CoreAudio turns one
+  down now and then. Backing off beats losing the run; the cost is one
+  noisier reading, which the noise floor already accounts for.
 - **A parameter is only audible if what it feeds is on.** A bipolar depth
   at raw 64 is zero depth, and an LFO with no destination cannot make its
   own speed or waveform heard. Thirty parameters first read as inaudible

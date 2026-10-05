@@ -24,6 +24,20 @@ from elektron_mcp.digitone.data.filters import (
     COMB_MINUS_FILTER_PARAMS,
     COMB_PLUS_FILTER_PARAMS,
 )
+from elektron_mcp.digitone.data.global_fx import (
+    CHORUS_PARAMS,
+    COMPRESSOR_PARAMS,
+    DELAY_PARAMS,
+    EXTERNAL_IN_PARAMS,
+    MASTER_PARAMS,
+    REVERB_PARAMS,
+)
+from elektron_mcp.digitone.data.track import (
+    EUCLID_PARAMS,
+    MISC_PARAMS,
+    TRACK_PARAMS,
+    TRIG_PARAMS,
+)
 from elektron_mcp.digitone.data.fm_drum import FM_DRUM_PARAMS
 from elektron_mcp.digitone.data.fm_tone import FM_TONE_PARAMS
 from elektron_mcp.digitone.data.fx import FX_PARAMS_DATA
@@ -101,7 +115,26 @@ SECTIONS: dict[str, dict] = {
     "filter_legacy_lp_hp": _flatten(LEGACY_LP_HP_FILTER_PARAMS),
     "filter_comb_minus": _flatten(COMB_MINUS_FILTER_PARAMS),
     "filter_comb_plus": _flatten(COMB_PLUS_FILTER_PARAMS),
+    # Per-track, alongside the machine and filter above.
+    "trig": _flatten(TRIG_PARAMS),
+    "track": _flatten(TRACK_PARAMS),
+    "euclid": _flatten(EUCLID_PARAMS),
+    "misc": _flatten(MISC_PARAMS),
+    # On the FX control channel, not a track's. Their CC numbers are free
+    # to collide with the per-track ones because of that.
+    "send_delay": _flatten(DELAY_PARAMS),
+    "send_reverb": _flatten(REVERB_PARAMS),
+    "send_chorus": _flatten(CHORUS_PARAMS),
+    "compressor": _flatten(COMPRESSOR_PARAMS),
+    "external_in": _flatten(EXTERNAL_IN_PARAMS),
+    "master": _flatten(MASTER_PARAMS),
 }
+
+# Sections addressed on the FX CONTROL CH rather than a track's channel
+# (SETTINGS > MIDI CONFIG > CHANNELS). Passing a track number to these
+# reaches nothing.
+FX_CHANNEL_SECTIONS = ("send_delay", "send_reverb", "send_chorus",
+                       "compressor", "external_in", "master")
 
 # Sections whose filter type must be selected on the device before its
 # parameters respond; surfaced in tool docstrings.

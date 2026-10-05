@@ -64,7 +64,7 @@ import mido                                                  # noqa: E402
 import numpy as np                                           # noqa: E402
 from rig_audio.analysis import mstft_distance                # noqa: E402
 from rig_audio.capture import (                              # noqa: E402
-    SubprocessRecorder, record,
+    CaptureError, SubprocessRecorder, _reinit_portaudio, record,
 )
 
 from rig_audio.analysis import describe                      # noqa: E402
@@ -76,10 +76,17 @@ SYN_MACHINES = ("fm_drum", "fm_tone", "swarmer", "wavetone")
 FILTER_MACHINES = ("filter_multi_mode", "filter_lowpass4",
                    "filter_equalizer", "filter_legacy_lp_hp",
                    "filter_comb_minus", "filter_comb_plus")
-# Shared by every machine, so always included.
-COMMON = ("amp", "fx", "lfo1", "lfo2", "lfo3", "filter_base_width")
+# Shared by every machine, so always included. The send effects, mixer and
+# master overdrive are deliberately absent: they live on the FX control
+# channel, not a track's, and their CC numbers collide with these.
+COMMON = ("amp", "fx", "lfo1", "lfo2", "lfo3", "filter_base_width",
+          "trig", "track", "euclid", "misc")
 
-# What each descriptor change means, for reporting what actually moved.
+# What each descriptor change means. The floor for each is measured per
+# run rather than assumed: how much a descriptor wanders between two
+# recordings of the same patch depends entirely on what is being recorded,
+# and a quiet decaying tail wanders far more than a struck note. The
+# fallback is used only when a run cannot measure its own.
 DESCRIPTORS = {
     "rms": ("level", 0.15),
     "spectral_centroid_hz": ("brightness", 0.08),
@@ -158,10 +165,12 @@ def nrpn_of(spec):
     return int(spec["nrpn_lsb"]), int(spec["nrpn_msb"])
 
 
-def sections_for(machine, filter_machine):
-    """The sections that can be swept together without a CC collision."""
-    chosen = [machine, filter_machine] + list(COMMON)
-    sections = {name: SECTIONS[name] for name in chosen}
+def collisions_in(sections):
+    """CCs that more than one parameter in this set claims.
+
+    Any entry here means the patch cannot be sent: whichever parameter is
+    written last wins, and every probe measures the same sound.
+    """
     claims = {}
     clashes = []
     for name, params in sections.items():
@@ -172,21 +181,43 @@ def sections_for(machine, filter_machine):
             if cc in claims:
                 clashes.append(f"CC {cc}: {claims[cc]} and {name}.{ident}")
             claims[cc] = f"{name}.{ident}"
+    return clashes
+
+
+def sections_for(machine, filter_machine):
+    """The sections that can be swept together without a CC collision."""
+    chosen = [machine, filter_machine] + list(COMMON)
+    sections = {name: SECTIONS[name] for name in chosen}
+    clashes = collisions_in(sections)
     if clashes:
         raise ValueError("chosen sections collide: " + "; ".join(clashes))
     return sections
 
 
-def changed_descriptors(ref_desc, probe_desc):
-    """Which descriptors moved, and by how much, as fractions."""
-    moved = {}
-    for key, (label, tolerance) in DESCRIPTORS.items():
+def descriptor_deltas(ref_desc, probe_desc):
+    """Each descriptor's fractional move, whether or not it is significant."""
+    deltas = {}
+    for key, (label, _) in DESCRIPTORS.items():
         a, b = ref_desc.get(key), probe_desc.get(key)
         if not isinstance(a, (int, float)) or not isinstance(b, (int, float)):
             continue
         scale = max(abs(a), abs(b), 1e-9)
-        delta = abs(b - a) / scale
-        if delta > tolerance:
+        deltas[label] = abs(b - a) / scale
+    return deltas
+
+
+def changed_descriptors(ref_desc, probe_desc, thresholds=None):
+    """Which descriptors moved beyond their floor, and by how much."""
+    moved = {}
+    for label, delta in descriptor_deltas(ref_desc, probe_desc).items():
+        if thresholds is not None:
+            limit = thresholds.get(label)
+            if limit is None:
+                continue
+        else:
+            limit = next(t for _, (lab, t) in DESCRIPTORS.items()
+                         if lab == label)
+        if delta > limit:
             moved[label] = round(delta, 3)
     return moved
 
@@ -209,13 +240,15 @@ def probe_values(spec):
 
 
 class Device:
-    def __init__(self, port_match, channel, note, velocity, gate_ms):
+    def __init__(self, port_match, channel, note, velocity, gate_ms,
+                 retrigger_ms=0):
         self.port = mido.open_output(
             next(p for p in mido.get_output_names() if port_match in p))
         self.channel = channel - 1
         self.note = note
         self.velocity = velocity
         self.gate_ms = gate_ms
+        self.retrigger_ms = retrigger_ms
 
     def send_patch(self, sections, patch, skip=None):
         for name, params in sections.items():
@@ -252,12 +285,39 @@ class Device:
             time.sleep(0.003)
         return True
 
+    def silence(self):
+        """Cut the previous note off rather than waiting it out.
+
+        A long release can ring for several seconds -- longer than any
+        sensible settle wait -- and then every capture holds a different
+        amount of the last note, which is exactly the overlap that put an
+        unchanged patch 0.28 apart early on. All Notes Off, then All Sound
+        Off, which ignores release.
+        """
+        for control in (123, 120):
+            self.port.send(mido.Message(
+                "control_change", channel=self.channel, control=control,
+                value=0))
+        time.sleep(0.04)
+
     def strike(self):
         self.port.send(mido.Message("note_on", channel=self.channel,
                                     note=self.note, velocity=self.velocity))
         time.sleep(self.gate_ms / 1000.0)
         self.port.send(mido.Message("note_off", channel=self.channel,
                                     note=self.note))
+        # A parameter that only acts when a new trig arrives -- an envelope
+        # reset, say -- cannot show itself on a single note. The second
+        # strike lands while the first is still sounding, which is the only
+        # condition under which a reset is audible.
+        if self.retrigger_ms:
+            time.sleep(self.retrigger_ms / 1000.0)
+            self.port.send(mido.Message(
+                "note_on", channel=self.channel, note=self.note,
+                velocity=self.velocity))
+            time.sleep(self.gate_ms / 1000.0)
+            self.port.send(mido.Message("note_off", channel=self.channel,
+                                        note=self.note))
 
     def close(self, sections=None, patch=None):
         """Leave the track as it was found, not on the last probe value.
@@ -273,10 +333,31 @@ class Device:
         self.port.close()
 
 
-def wait_for_silence(audio_device):
-    """Let the previous note decay, so a capture holds one note only."""
+def wait_for_silence(audio_device, device=None):
+    """Let the previous note decay, so a capture holds one note only.
+
+    This polls, which means opening the audio device repeatedly -- several
+    thousand times across a full sweep. CoreAudio occasionally refuses one
+    of those, so a failure here backs off and keeps going rather than
+    losing the run: the cost of being wrong is one noisier reading, and the
+    noise floor accounts for it.
+    """
+    if device is not None:
+        device.silence()
+    failures = 0
     for _ in range(SILENCE_TRIES):
-        audio, _ = record(seconds=0.12, device=audio_device)
+        try:
+            audio, _ = record(seconds=0.12, device=audio_device)
+        except CaptureError:
+            failures += 1
+            if failures == 1:
+                _reinit_portaudio()
+            elif failures >= 3:
+                # Stop asking and just wait long enough for a tail.
+                time.sleep(0.6)
+                return False
+            time.sleep(0.2)
+            continue
         if float(np.abs(audio).max()) < SILENCE_PEAK:
             return True
     return False
@@ -292,45 +373,70 @@ def balance(audio):
     return 0.5 if total <= 0 else left / total
 
 
-def align(audio, samplerate, keep=0.7, frac=0.05):
-    """Trim to the note's own onset.
+def align(audio, samplerate, keep=0.7, frac=0.05, window=None):
+    """Trim to the note's own onset, optionally to a slice of it.
 
     mstft_distance compares frame by frame, so it is not shift invariant:
     a note landing a few milliseconds later reads as a different sound.
+
+    `window` is (start_ms, end_ms) measured from the onset. Some parameters
+    only act during part of a note -- a filter's release happens after the
+    key is up, a hold stage only in the plateau before decay -- and
+    comparing the whole note dilutes that into the noise floor.
     """
     mono = np.abs(audio).max(axis=1) if audio.ndim > 1 else np.abs(audio)
     peak = mono.max()
     if peak <= 0:
         return audio
     start = int(np.argmax(mono > frac * peak))
-    want = int(keep * samplerate)
-    segment = audio[start:start + want]
+    if window is not None:
+        begin = start + int(window[0] / 1000 * samplerate)
+        want = int((window[1] - window[0]) / 1000 * samplerate)
+    else:
+        begin = start
+        want = int(keep * samplerate)
+    segment = audio[begin:begin + want]
     if len(segment) < want:
         pad = [(0, want - len(segment))] + [(0, 0)] * (audio.ndim - 1)
         segment = np.pad(segment, pad)
     return segment
 
 
-def capture(device, audio_device, seconds):
-    wait_for_silence(audio_device)
-    rec = SubprocessRecorder(seconds=seconds, device=audio_device).start()
-    device.strike()
-    audio, samplerate = rec.finish()
-    return align(audio, samplerate), samplerate
+def capture(device, audio_device, seconds, window=None, attempts=3):
+    """Record one strike, retrying a refused device rather than aborting."""
+    wait_for_silence(audio_device, device)
+    for attempt in range(attempts):
+        try:
+            rec = SubprocessRecorder(seconds=seconds,
+                                     device=audio_device).start()
+        except CaptureError:
+            if attempt == attempts - 1:
+                raise
+            _reinit_portaudio()
+            time.sleep(0.5)
+            continue
+        device.strike()
+        audio, samplerate = rec.finish()
+        return align(audio, samplerate, window=window), samplerate
 
 
 def measure_noise_floor(device, sections, patch, audio_device, seconds,
-                        repeats):
+                        repeats, window=None):
     """How much two recordings of the same patch differ, on both measures."""
     device.send_patch(sections, patch)
-    ref, sr = capture(device, audio_device, seconds)
+    ref, sr = capture(device, audio_device, seconds, window)
+    ref_desc = describe(ref, sr)
     distances, balances = [], []
+    wander = {}
     for _ in range(repeats):
         device.send_patch(sections, patch)
-        again, _ = capture(device, audio_device, seconds)
+        again, _ = capture(device, audio_device, seconds, window)
         distances.append(mstft_distance(ref, again, sr)["distance"])
         balances.append(abs(balance(again) - balance(ref)))
-    return ref, sr, distances, balances
+        for label, delta in descriptor_deltas(ref_desc,
+                                              describe(again, sr)).items():
+            wander.setdefault(label, []).append(delta)
+    return ref, sr, distances, balances, wander
 
 
 def main():
@@ -347,6 +453,17 @@ def main():
                     help="the filter machine assigned to the track")
     ap.add_argument("--sections", default="",
                     help="restrict to these, from the compatible set")
+    ap.add_argument("--window-ms", default="",
+                    metavar="START:END",
+                    help="analyse only this slice of the note, measured "
+                         "from its onset. A filter release acts after the "
+                         "key is up and a hold stage only in the plateau "
+                         "before decay, so comparing the whole note "
+                         "dilutes either into the noise")
+    ap.add_argument("--retrigger-ms", type=int, default=0,
+                    help="play a second note this long after the first "
+                         "releases, for parameters that only act on a new "
+                         "trig, such as an envelope reset")
     ap.add_argument("--set", action="append", default=[],
                     metavar="SECTION.PARAM=VALUE",
                     help="override one baseline value. A parameter is only "
@@ -424,17 +541,34 @@ def main():
                if not only or f"{name}.{ident}" in only]
     total = len(probing)
 
+    window = None
+    if args.window_ms:
+        try:
+            begin, _, end = args.window_ms.partition(":")
+            window = (float(begin), float(end))
+        except ValueError:
+            print("--window-ms wants START:END in milliseconds")
+            return 2
+        if window[1] <= window[0]:
+            print("--window-ms needs END after START")
+            return 2
+
     device = Device(args.port, args.track, args.note, args.velocity,
-                    args.gate_ms)
+                    args.gate_ms, args.retrigger_ms)
+    extra = ""
+    if window:
+        extra += f", window {window[0]:.0f}-{window[1]:.0f} ms"
+    if args.retrigger_ms:
+        extra += f", retrigger after {args.retrigger_ms} ms"
     print(f"track {args.track}, machine {args.machine}, filter "
           f"{args.filter_machine}, {args.profile} "
-          f"(gate {args.gate_ms} ms)")
+          f"(gate {args.gate_ms} ms){extra}")
     print(f"{len(sections)} sections, {total} parameters")
     try:
         print("measuring the noise floor...")
-        ref, sr, floor, bal_floor = measure_noise_floor(
+        ref, sr, floor, bal_floor, wander = measure_noise_floor(
             device, sections, patch, args.audio_device, args.seconds,
-            args.noise_repeats)
+            args.noise_repeats, window)
         if max(abs(ref).max(), 0) < 1e-4:
             print("  the capture is silent -- check the track is audible "
                   "and the audio input is the device")
@@ -451,12 +585,27 @@ def main():
               f"  -> a shift must exceed {bal_threshold:.4f}")
         ref_balance = balance(ref)
         ref_desc = describe(ref, sr)
-        if mean > FLOOR_UNUSABLE:
-            print(f"  the baseline is not stable enough to measure: an "
-                  f"unchanged patch differs by {mean:.3f}. Pick settings "
-                  f"where the note is clearly audible -- a nearly closed "
-                  f"filter or a near-silent envelope does this.")
-            return 1
+
+        # Each descriptor gets the floor it actually showed on this
+        # material, with a small absolute minimum so a suspiciously steady
+        # reading cannot make the bar zero.
+        desc_thresholds = {}
+        for label, samples in wander.items():
+            d_mean = statistics.fmean(samples)
+            d_sd = statistics.stdev(samples) if len(samples) > 1 else 0.0
+            desc_thresholds[label] = max(d_mean + args.sigma * d_sd, 0.05)
+        print("  descriptor floors: " + ", ".join(
+            f"{label} {limit:.3f}"
+            for label, limit in sorted(desc_thresholds.items())))
+
+        # A quiet decaying tail is unstable under a log-STFT comparison but
+        # its descriptors stay meaningful, so an unusable spectral floor
+        # drops that measure rather than the whole run.
+        spectral_usable = mean <= FLOOR_UNUSABLE
+        if not spectral_usable:
+            print(f"  the spectral distance is unusable here: an unchanged "
+                  f"patch differs by {mean:.3f}. Falling back to the "
+                  f"descriptors, which measure this material fine.")
         if float(ref_desc.get("rms") or 0) < QUIET_RMS:
             print(f"  the baseline is too quiet to measure: rms "
                   f"{ref_desc.get('rms')}. Raise the level or lengthen "
@@ -538,9 +687,13 @@ def main():
         "noise_floor": {"mean": mean, "sd": sd, "threshold": threshold,
                         "samples": floor,
                         "balance_mean": bal_mean, "balance_sd": bal_sd,
-                        "balance_threshold": bal_threshold},
+                        "balance_threshold": bal_threshold,
+                        "descriptor_thresholds": desc_thresholds,
+                        "spectral_usable": spectral_usable},
         "settings": {"seconds": args.seconds, "sigma": args.sigma,
-                     "gate_ms": args.gate_ms, "profile": args.profile},
+                     "gate_ms": args.gate_ms, "profile": args.profile,
+                     "window_ms": args.window_ms or None,
+                     "retrigger_ms": args.retrigger_ms or None},
         "results": results,
     }
     if args.out:

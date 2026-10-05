@@ -34,8 +34,13 @@ def test_every_parameter_is_reachable_by_a_tool():
 
 
 def test_parameter_total_is_stable():
-    """Guards against a data map silently losing parameters."""
-    assert sum(len(p) for p in SECTIONS.values()) == 184
+    """Guards against a data map silently losing parameters.
+
+    184 for a long while, which turned out to be five of Appendix C's
+    eleven subsections. The trig, track and euclidean parameters, the whole
+    send-effects and mixer block, and the master overdrive were all absent.
+    """
+    assert sum(len(p) for p in SECTIONS.values()) == 244
 
 
 @pytest.mark.parametrize("section", sorted(SECTIONS))
@@ -206,3 +211,62 @@ def test_declared_midi_range_covers_every_named_option():
                     f"outside declared {lo}-{hi}"
                 )
     assert offenders == [], "\n".join(offenders)
+
+
+def test_appendix_c_subsections_are_all_represented():
+    """Every parameter block the manual documents has a section here.
+
+    The map covered only the machines, filter, amp, FX and LFOs for a long
+    time -- five of Appendix C's eleven subsections. These are the others,
+    named by where they live rather than by count, so a renamed section
+    fails loudly instead of quietly shrinking the map.
+    """
+    expected = {
+        "trig",         # C.2
+        "track",        # C.1
+        "euclid",       # C.6
+        "misc",         # C.12, the per-track half
+        "send_delay",   # C.9
+        "send_reverb",  # C.9
+        "send_chorus",  # C.9
+        "compressor",   # C.10
+        "external_in",  # C.10
+        "master",       # C.12, the FX-channel half
+    }
+    assert expected <= set(SECTIONS)
+
+
+def test_euclidean_sequencer_is_nrpn_only():
+    """Appendix C.6 leaves the CC column empty for all seven, as it does
+    for LFO 3."""
+    euclid = SECTIONS["euclid"]
+    assert len(euclid) == 7
+    assert all("cc_msb" not in spec for spec in euclid.values())
+    assert [int(s["nrpn_msb"]) for s in euclid.values()] == [
+        8, 9, 10, 11, 12, 13, 14,
+    ]
+
+
+def test_fx_channel_sections_are_marked_as_such():
+    """These are addressed on the FX CONTROL CH, not a track's channel.
+    That is also why their CCs may collide with the per-track ones, so
+    anything that sends a whole patch has to keep the two apart."""
+    from elektron_mcp.digitone.data.sections import FX_CHANNEL_SECTIONS
+
+    assert set(FX_CHANNEL_SECTIONS) <= set(SECTIONS)
+    # The collision is real: the chorus and the source machines both use
+    # CC 70, and the compressor and LFO 2 both use CC 111.
+    chorus = {int(s["cc_msb"]) for s in SECTIONS["send_chorus"].values()}
+    lfo2 = {int(s["cc_msb"]) for s in SECTIONS["lfo2"].values()}
+    comp = {int(s["cc_msb"]) for s in SECTIONS["compressor"].values()}
+    assert 70 in chorus
+    assert comp & lfo2
+
+
+def test_external_in_names_each_control_once():
+    """Appendix C.10 lists every external input control twice -- as
+    separate L and R controls and again as a linked pair -- on the same CC
+    both times. Naming both would put two identifiers on one CC and make
+    setting either move the other."""
+    ccs = [int(s["cc_msb"]) for s in SECTIONS["external_in"].values()]
+    assert len(ccs) == len(set(ccs))
