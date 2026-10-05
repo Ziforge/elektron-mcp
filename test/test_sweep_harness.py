@@ -138,3 +138,43 @@ def test_unusable_floor_constant_is_set_from_what_was_observed():
     """One configuration measured 2.31 against itself; anything that far
     from zero makes every verdict taken against it noise."""
     assert 0 < sweep.FLOOR_UNUSABLE < 2.31
+
+
+def test_a_cc_only_collides_within_one_channel():
+    """The send effects answer on the FX control channel, so their CC
+    numbers are free to repeat the track's -- and do. Treating those as
+    clashes kept 43 parameters out of the sweep for no reason."""
+    track_only = sweep.sections_for("fm_drum", "filter_multi_mode")
+    with_fx = sweep.sections_for("fm_drum", "filter_multi_mode",
+                                 fx_channel=9)
+    assert sweep.collisions_in(track_only) == []
+    assert sweep.collisions_in(with_fx) == []
+    assert len(with_fx) > len(track_only)
+
+    # The overlap is real, which is why it has to be the channel that
+    # separates them and not luck.
+    from elektron_mcp.digitone.data.sections import SECTIONS
+    chorus = {int(s["cc_msb"]) for s in SECTIONS["send_chorus"].values()}
+    source = {int(s["cc_msb"]) for s in SECTIONS["fm_drum"].values()}
+    assert chorus & source
+
+
+def test_sections_route_to_their_own_channel():
+    device = sweep.Device.__new__(sweep.Device)
+    device.channel = 13          # track 14, zero-based
+    device.fx_channel = 8        # FX control channel 9, zero-based
+    assert device.channel_for("fm_drum") == 13
+    assert device.channel_for("amp") == 13
+    assert device.channel_for("send_reverb") == 8
+    assert device.channel_for("compressor") == 8
+
+
+def test_an_fx_section_without_its_channel_is_refused():
+    """Silently sending it to the track's channel would set whatever the
+    track happens to have on that CC instead."""
+    device = sweep.Device.__new__(sweep.Device)
+    device.channel = 13
+    device.fx_channel = None
+    assert device.channel_for("amp") == 13
+    with pytest.raises(ValueError, match="FX control channel"):
+        device.channel_for("send_reverb")

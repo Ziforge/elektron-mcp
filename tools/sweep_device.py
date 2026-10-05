@@ -68,7 +68,9 @@ from rig_audio.capture import (                              # noqa: E402
 )
 
 from rig_audio.analysis import describe                      # noqa: E402
-from elektron_mcp.digitone.data.sections import SECTIONS     # noqa: E402
+from elektron_mcp.digitone.data.sections import (            # noqa: E402
+    FX_CHANNEL_SECTIONS, SECTIONS,
+)
 
 # One per track. Each names the same CCs as its siblings, so only one can
 # be in a sweep at a time.
@@ -76,11 +78,15 @@ SYN_MACHINES = ("fm_drum", "fm_tone", "swarmer", "wavetone")
 FILTER_MACHINES = ("filter_multi_mode", "filter_lowpass4",
                    "filter_equalizer", "filter_legacy_lp_hp",
                    "filter_comb_minus", "filter_comb_plus")
-# Shared by every machine, so always included. The send effects, mixer and
-# master overdrive are deliberately absent: they live on the FX control
-# channel, not a track's, and their CC numbers collide with these.
+# Shared by every machine, so always included.
 COMMON = ("amp", "fx", "lfo1", "lfo2", "lfo3", "filter_base_width",
           "trig", "track", "euclid", "misc")
+
+# The send effects, mixer and master overdrive answer on the FX control
+# channel instead, so they can be swept alongside the track sections only
+# once that channel is known -- their CC numbers collide with the per-track
+# ones precisely because they are addressed separately.
+FX_SECTIONS = tuple(FX_CHANNEL_SECTIONS)
 
 # What each descriptor change means. The floor for each is measured per
 # run rather than assumed: how much a descriptor wanders between two
@@ -174,19 +180,29 @@ def collisions_in(sections):
     claims = {}
     clashes = []
     for name, params in sections.items():
+        # A CC only clashes with another on the same channel.
+        channel = "fx" if name in FX_SECTIONS else "track"
         for ident, spec in params.items():
             cc = cc_of(spec)
             if cc is None:
                 continue
-            if cc in claims:
-                clashes.append(f"CC {cc}: {claims[cc]} and {name}.{ident}")
-            claims[cc] = f"{name}.{ident}"
+            key = (channel, cc)
+            if key in claims:
+                clashes.append(f"CC {cc}: {claims[key]} and {name}.{ident}")
+            claims[key] = f"{name}.{ident}"
     return clashes
 
 
-def sections_for(machine, filter_machine):
-    """The sections that can be swept together without a CC collision."""
+def sections_for(machine, filter_machine, fx_channel=None):
+    """The sections that can be swept together without a CC collision.
+
+    With an FX channel given, the send effects and mixer come too: they are
+    addressed on that channel, so their CCs no longer clash with the
+    track's.
+    """
     chosen = [machine, filter_machine] + list(COMMON)
+    if fx_channel:
+        chosen += list(FX_SECTIONS)
     sections = {name: SECTIONS[name] for name in chosen}
     clashes = collisions_in(sections)
     if clashes:
@@ -241,7 +257,7 @@ def probe_values(spec):
 
 class Device:
     def __init__(self, port_match, channel, note, velocity, gate_ms,
-                 retrigger_ms=0):
+                 retrigger_ms=0, fx_channel=None):
         self.port = mido.open_output(
             next(p for p in mido.get_output_names() if port_match in p))
         self.channel = channel - 1
@@ -249,13 +265,27 @@ class Device:
         self.velocity = velocity
         self.gate_ms = gate_ms
         self.retrigger_ms = retrigger_ms
+        # The send effects and mixer answer here instead of on the track's
+        # channel, which is why their CC numbers may repeat the track's.
+        self.fx_channel = (fx_channel - 1) if fx_channel else None
+
+    def channel_for(self, section):
+        """Which MIDI channel a section is addressed on."""
+        if section in FX_SECTIONS:
+            if self.fx_channel is None:
+                raise ValueError(
+                    f"{section} lives on the FX control channel, which was "
+                    f"not given")
+            return self.fx_channel
+        return self.channel
 
     def send_patch(self, sections, patch, skip=None):
         for name, params in sections.items():
+            channel = self.channel_for(name)
             for ident, spec in params.items():
                 if skip == (name, ident):
                     continue
-                self.send_param(spec, patch[name][ident])
+                self.send_param(spec, patch[name][ident], channel)
                 # ~1 kB/s across a full-map resend: fast enough that the
                 # sweep finishes, slow enough not to flood the input.
                 time.sleep(0.003)
@@ -263,12 +293,14 @@ class Device:
         # size before the next note reflects all of it.
         time.sleep(0.12)
 
-    def send_param(self, spec, value):
+    def send_param(self, spec, value, channel=None):
         """Set one parameter, by CC or by NRPN as the map declares."""
+        if channel is None:
+            channel = self.channel
         cc = cc_of(spec)
         if cc is not None:
             self.port.send(mido.Message(
-                "control_change", channel=self.channel, control=cc,
+                "control_change", channel=channel, control=cc,
                 value=int(value)))
             time.sleep(0.003)
             return True
@@ -280,7 +312,7 @@ class Device:
         for control, data in ((99, msb), (98, lsb),
                               (6, int(value)), (38, 0)):
             self.port.send(mido.Message(
-                "control_change", channel=self.channel, control=control,
+                "control_change", channel=channel, control=control,
                 value=int(data)))
             time.sleep(0.003)
         return True
@@ -451,6 +483,10 @@ def main():
     ap.add_argument("--filter", dest="filter_machine",
                     default="filter_multi_mode", choices=FILTER_MACHINES,
                     help="the filter machine assigned to the track")
+    ap.add_argument("--fx-channel", type=int, default=0,
+                    help="the FX CONTROL CH, which brings the send effects "
+                         "and mixer into the sweep. tools/"
+                         "find_fx_channel.py discovers it")
     ap.add_argument("--sections", default="",
                     help="restrict to these, from the compatible set")
     ap.add_argument("--window-ms", default="",
@@ -493,7 +529,8 @@ def main():
     args = ap.parse_args()
 
     try:
-        compatible = sections_for(args.machine, args.filter_machine)
+        compatible = sections_for(args.machine, args.filter_machine,
+                                  args.fx_channel)
     except ValueError as e:
         print(e)
         return 2
@@ -554,12 +591,15 @@ def main():
             return 2
 
     device = Device(args.port, args.track, args.note, args.velocity,
-                    args.gate_ms, args.retrigger_ms)
+                    args.gate_ms, args.retrigger_ms,
+                    args.fx_channel or None)
     extra = ""
     if window:
         extra += f", window {window[0]:.0f}-{window[1]:.0f} ms"
     if args.retrigger_ms:
         extra += f", retrigger after {args.retrigger_ms} ms"
+    if args.fx_channel:
+        extra += f", FX channel {args.fx_channel}"
     print(f"track {args.track}, machine {args.machine}, filter "
           f"{args.filter_machine}, {args.profile} "
           f"(gate {args.gate_ms} ms){extra}")
