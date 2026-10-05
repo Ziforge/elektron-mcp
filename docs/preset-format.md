@@ -276,3 +276,51 @@ Offsets 203-207, 213, 219, 225 and 227. Their original values were 0 or 1,
 shared by five 0/1 toggle parameters, so neither value-search nor clamping
 separates them. A calibration with distinct values in a high, rare range
 resolves them in one save.
+
+## Clamping is NOT a usable fingerprint (disproved)
+
+An earlier plan here was to identify parameters by what the device clamps a
+written value to. Tested directly against all 30 FM DRUM offsets by writing
+127 to each: the device accepted 127 for `algo` (documented maximum 6),
+`tran` (124), `ph_c` (91) and `nrst` (1).
+
+So the device stores whatever byte is written and enforces a parameter's
+range only when the value is used, not when it is stored. The method cannot
+distinguish parameters, and the apparently-agreeing results were vacuous:
+writing 127 to a 0-127 parameter proves nothing.
+
+Offset 221 remains the one observed clamp, to 80, and is now harder to
+interpret rather than easier.
+
+## Variable-width parameters
+
+Writing these shifts the payload and needs read-back verification. Writing
+any other located parameter preserves the length.
+
+| offset | parameter |
+|---|---|
+| 85 | tune |
+| 139 | nrm |
+| 201 | amp.vol |
+| 211 | fx.srr |
+| 215 | fx.over |
+| 243 | (unnamed) |
+
+`tune` matters most here: it is set in most patches, so a writer that does not
+verify can silently corrupt everything after it.
+
+## Parameter slots found by sweep, not yet named
+
+Confirmed writable, length-preserving, but not yet attributable to a
+parameter because the calibration left them at 0 or 1:
+
+145, 151, 153, 155, 157, 159, 161, 163, 165, 167, 171, 175, 177, 205, 207,
+213, 219, 225, 227, 235, 239, 241, 247, 251, 253
+
+That is 25 further slots, giving 43 named and roughly 68 located in total.
+Naming them needs a calibration whose values are distinct and in a high, rare
+range -- the sweep classifies bytes but cannot say which parameter a byte is.
+
+### Structural offsets (writes refused)
+
+147, 149, 169, 173, 181, 203, 217, 223, 229, 231, 233, 237, 245, 249, 255, 257
