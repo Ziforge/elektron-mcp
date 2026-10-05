@@ -1,5 +1,36 @@
 # Digitone II preset format (`.dn2pst`)
 
+## Prior art: read this before deriving anything
+
+**SYXGRID** (github.com/xrcstrecords/syxgrid-digitone-ii, AGPL-3.0) is a
+browser editor for whole Digitone II projects -- sequencer, sounds and kits --
+and publishes a SysEx format map with confidence grades and fixture counts,
+covering OS 1.10E/1.11/1.12. It documents things this file does not, including
+`TRACK_MACHINE` (machine selection per track, enum 0 FM TONE, 1 WAVETONE,
+2 FM DRUM, 3 SWARMER, 4 MIDI) and a per-track SYN parameter area.
+
+**libdigitone** (github.com/d-huck/libdigitone, MIT) parses Digitone mk1
+sound dumps and carries an ordered 144-entry parameter list plus the dump
+layout (prefix / meta / tags / name / data / eom, data at 0x29..0x14e).
+
+Two notes on using them:
+
+- SYXGRID is AGPL and this project is MIT. Facts such as byte offsets are
+  not copyrightable, but its 36 KB map is a curated compilation and should
+  not be vendored here. Either call SYXGRID as a separate program, or
+  relicense a merge as AGPL deliberately.
+- SYXGRID's offsets address a **different container**: a pattern SysEx
+  message, ~99,850 bytes decoded. Elektroid's `.dn2prj` export is ~259,685
+  bytes. Checked directly -- its TRACK_MACHINE offset reads 18 and 32 for
+  track 14 across two projects where the machine is known to be FM DRUM (2),
+  and only 4-6 of 16 tracks give plausible enums. The map is not wrong; it
+  describes a message this repo does not yet read.
+
+Everything below was derived independently by probing, before that search was
+done. It is verified against the hardware and remains accurate for the
+`.dn2pst` preset container, but the search should have come first.
+
+
 Observed by downloading a preset off the device with `elektroid-cli`. Enough
 is known to author the container and metadata; the parameter block is not yet
 decoded.
