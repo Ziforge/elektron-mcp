@@ -18,6 +18,7 @@ from elektron_mcp.tools.patch_tool import register_patch_tools
 from elektron_mcp.tools.learn_tool import register_learn_tools
 from elektron_mcp.rytm.data import RYTM_SECTIONS, RYTM_NOTES
 from elektron_mcp.tools.port_tool import register_port_tools
+from elektron_mcp.tools.preset_tool import register_preset_tools
 
 
 # Initialize MCP and MIDI
@@ -51,6 +52,9 @@ register_section_tools(mcp, midi, RYTM_SECTIONS, RYTM_NOTES)
 
 # Hand the MIDI port over to Elektroid/Transfer without stopping the server.
 register_port_tools(mcp, midi)
+
+# Preset and project transfer over Elektron SysEx, via the Elektroid CLI.
+register_preset_tools(mcp, midi)
 
 # Export the configured MCP server
 __all__ = ["mcp"]
