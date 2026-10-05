@@ -33,9 +33,29 @@ MACHINE_NOTE = {
 }
 
 
+def _nrpn_pair(spec: dict):
+    """The NRPN (MSB, LSB) for a parameter, or None.
+
+    The field names in the data files are inverted with respect to their
+    meaning: `nrpn_lsb` holds the parameter bank, which the manual lists as
+    the NRPN MSB, and `nrpn_msb` holds the parameter number, which is the
+    LSB. Appendix C of the Digitone II manual gives LFO 3 Speed as MSB 1,
+    LSB 58, and the data for it reads nrpn_lsb 1, nrpn_msb 58. Renaming the
+    fields would touch every map, so the correction lives here.
+    """
+    if "nrpn_msb" not in spec or "nrpn_lsb" not in spec:
+        return None
+    return int(spec["nrpn_lsb"]), int(spec["nrpn_msb"])
+
+
 def _describe(ident: str, spec: dict) -> str:
-    """One docstring line for a parameter: CC number and display range."""
-    bits = [f"CC {spec['cc_msb']}"]
+    """One docstring line for a parameter: how it is addressed and its
+    display range."""
+    if "cc_msb" in spec:
+        bits = [f"CC {spec['cc_msb']}"]
+    else:
+        pair = _nrpn_pair(spec)
+        bits = [f"NRPN {pair[0]}:{pair[1]}" if pair else "no CC or NRPN"]
 
     lo, hi = spec.get("min_val", 0), spec.get("max_val", 127)
     if (lo, hi) != (0, 127):
@@ -132,16 +152,25 @@ def to_midi_value(spec: dict, value) -> tuple[Optional[int], Optional[str]]:
 
 
 def _send(midi, spec: dict, track: int, midi_value: int, use_nrpn: bool) -> bool:
-    # Not every parameter map carries NRPN numbers -- maps transcribed from
-    # Cirklon instrument definitions have CC only -- so the request is
-    # honoured when possible and silently degrades to CC when not.
-    if use_nrpn and "nrpn_msb" in spec and "nrpn_lsb" in spec:
+    pair = _nrpn_pair(spec)
+    has_cc = "cc_msb" in spec
+
+    # Some parameters have no CC at all. The Digitone II's LFO 3 is the
+    # case: Appendix C.8 leaves its CC column empty and lists only NRPN,
+    # so for those there is nothing to degrade to.
+    if pair and (use_nrpn or not has_cc):
         # NRPN is 14-bit; scale the 7-bit value up so the two paths agree.
-        if midi.send_nrpn(
-            track, int(spec["nrpn_msb"]), int(spec["nrpn_lsb"]), midi_value << 7
-        ):
+        if midi.send_nrpn(track, pair[0], pair[1], midi_value << 7):
             return True
+        if not has_cc:
+            return False
         # Fall back rather than fail: not every parameter answers to NRPN.
+
+    # Not every parameter map carries NRPN numbers -- maps transcribed from
+    # Cirklon instrument definitions have CC only -- so an NRPN request
+    # degrades to CC when the map cannot honour it.
+    if not has_cc:
+        return False
     return midi.send_cc(track, int(spec["cc_msb"]), midi_value)
 
 

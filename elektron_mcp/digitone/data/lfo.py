@@ -217,9 +217,15 @@ LFO2_PARAMS = {
 }
 
 LFO3_PARAMS = {
-    "SPD": {"cc_msb": 121, "nrpn_lsb": 1, "nrpn_msb": 58, "default": 48},
+    # LFO 3 is NRPN-only. Appendix C.8 of the manual leaves the CC MSB
+    # column empty for every one of its parameters, and the CC numbers that
+    # used to be here (121-128) were invented by continuing the LFO 1 and 2
+    # run. They were not merely wrong: 121 to 127 are MIDI channel mode
+    # messages, so LFO 3 FADE sent All Notes Off and the higher ones
+    # switched the device's MIDI mode. 128 is not a valid CC at all, which
+    # is how a hardware sweep caught this.
+    "SPD": {"nrpn_lsb": 1, "nrpn_msb": 58, "default": 48},
     "MULT": {
-        "cc_msb": 122,
         "nrpn_lsb": 1,
         "nrpn_msb": 59,
         "max_midi": 11,
@@ -228,7 +234,6 @@ LFO3_PARAMS = {
         "default": 2,
     },
     "FADE": {
-        "cc_msb": 123,
         "nrpn_lsb": 1,
         "nrpn_msb": 60,
         "max_val": 63,
@@ -236,7 +241,6 @@ LFO3_PARAMS = {
         "default": 0,
     },
     "DEST": {
-        "cc_msb": 124,
         "nrpn_lsb": 1,
         "nrpn_msb": 61,
         "max_midi": 50,
@@ -257,7 +261,6 @@ LFO3_PARAMS = {
         "options": dict(LFO2_PARAMS["DEST"]["options"]),
     },
     "WAVE": {
-        "cc_msb": 125,
         "nrpn_lsb": 1,
         "nrpn_msb": 62,
         "max_midi": 6,
@@ -265,9 +268,8 @@ LFO3_PARAMS = {
         "default": "sine",
         "options": ["tri", "sine", "sqr", "saw", "expo", "ramp", "rand"],
     },
-    "SPH": {"cc_msb": 126, "nrpn_lsb": 1, "nrpn_msb": 70},
+    "SPH": {"nrpn_lsb": 1, "nrpn_msb": 70},
     "MODE": {
-        "cc_msb": 127,
         "nrpn_lsb": 1,
         "nrpn_msb": 71,
         "max_midi": 4,
@@ -275,5 +277,5 @@ LFO3_PARAMS = {
         "default": "free",
         "options": ["free", "trig", "hold", "one", "half"],
     },
-    "DEP": {"cc_msb": 128, "nrpn_lsb": 1, "nrpn_msb": 72},
+    "DEP": {"nrpn_lsb": 1, "nrpn_msb": 72},
 }

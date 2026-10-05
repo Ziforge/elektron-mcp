@@ -32,12 +32,22 @@ from elektron_mcp.digitone.data.swarmer import SWARMER_PARAMS
 from elektron_mcp.digitone.data.wavetone import WAVETONE_PARAMS
 
 
+def _is_parameter(spec: dict) -> bool:
+    """Whether a dict is a parameter rather than a group of them.
+
+    A parameter is addressable, by CC or by NRPN. Requiring a cc_msb would
+    drop the ones that have no CC at all -- the Digitone II's LFO 3 is
+    NRPN-only -- and worse, mistake each of them for a nested group.
+    """
+    return "cc_msb" in spec or "nrpn_msb" in spec
+
+
 def _walk(node: dict, page: str, path: tuple, out: dict) -> None:
-    """Recursively collect leaf parameters (those carrying a cc_msb)."""
+    """Recursively collect leaf parameters (the addressable ones)."""
     for label, spec in node.items():
         if not isinstance(spec, dict):
             continue
-        if "cc_msb" in spec:
+        if _is_parameter(spec):
             here = path + (label,)
             ident = "_".join(to_identifier(p) for p in here)
             if ident in out:
@@ -61,7 +71,7 @@ def _flatten(params: dict) -> dict:
     the manual.
     """
     is_paged = all(
-        isinstance(v, dict) and "cc_msb" not in v and bool(v)
+        isinstance(v, dict) and not _is_parameter(v) and bool(v)
         and all(isinstance(x, dict) for x in v.values())
         for v in params.values()
     ) and all(k.startswith("page_") for k in params)

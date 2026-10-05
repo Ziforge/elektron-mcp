@@ -47,6 +47,8 @@ def test_no_duplicate_cc_within_a_section(section):
     seen: dict[int, str] = {}
     clashes = []
     for ident, spec in SECTIONS[section].items():
+        if "cc_msb" not in spec:
+            continue  # NRPN-only: nothing to clash with.
         cc = int(spec["cc_msb"])
         if cc in seen:
             clashes.append((cc, seen[cc], ident))
@@ -132,3 +134,48 @@ def test_lfo3_lfo2_targets_remain_an_explicit_gap():
 
     o3 = LFO3_PARAMS["DEST"]["options"]
     assert [k for k in o3 if k.startswith("lfo2_")] == []
+
+
+def test_no_parameter_uses_a_reserved_or_impossible_cc():
+    """CC 120 to 127 are MIDI channel mode messages, not parameters.
+
+    The Digitone II's LFO 3 carried invented CCs 121 to 128, continued from
+    the LFO 1 and LFO 2 runs. The manual lists no CC for LFO 3 at all. Those
+    numbers were not merely wrong: 123 is All Notes Off, so setting LFO 3
+    FADE silenced the track, and 124 to 127 switch the device's MIDI mode.
+    128 is not a valid CC, which is how a hardware sweep surfaced it.
+    """
+    offenders = []
+    for section, params in SECTIONS.items():
+        for ident, spec in params.items():
+            if "cc_msb" not in spec:
+                continue
+            cc = int(spec["cc_msb"])
+            if not 0 <= cc <= 119:
+                offenders.append(f"{section}.{ident} = CC {cc}")
+    assert offenders == [], f"reserved or impossible CCs: {offenders}"
+
+
+def test_every_parameter_is_addressable_somehow():
+    """By CC or by NRPN. A parameter with neither cannot be sent at all."""
+    unreachable = [
+        f"{section}.{ident}"
+        for section, params in SECTIONS.items()
+        for ident, spec in params.items()
+        if "cc_msb" not in spec and "nrpn_msb" not in spec
+    ]
+    assert unreachable == []
+
+
+def test_lfo3_is_nrpn_only_with_the_numbers_from_the_manual():
+    """Appendix C.8: LFO 3 Speed is NRPN MSB 1, LSB 58, through Depth at
+    LSB 72 -- note the jump from 62 to 70 between Waveform and Start
+    Phase, which is in the manual too."""
+    lfo3 = SECTIONS["lfo3"]
+    assert all("cc_msb" not in spec for spec in lfo3.values())
+    # The data files name these fields the other way round: nrpn_lsb holds
+    # the bank, which the manual calls the MSB.
+    assert [int(s["nrpn_msb"]) for s in lfo3.values()] == [
+        58, 59, 60, 61, 62, 70, 71, 72,
+    ]
+    assert {int(s["nrpn_lsb"]) for s in lfo3.values()} == {1}

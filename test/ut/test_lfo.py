@@ -363,10 +363,16 @@ def test_lfo2_all_params():
 
 
 def test_lfo3_all_params():
-    """Test all parameters in LFO3"""
+    """Test all parameters in LFO3.
+
+    LFO 3 is NRPN-only: Appendix C.8 of the manual leaves its CC column
+    empty for every parameter. The CC numbers this test used to expect,
+    121 to 128, had been invented by continuing the LFO 1 and 2 run, and
+    121 to 127 are MIDI channel mode messages.
+    """
     expected_params = {
         "SPD": {
-            "midi": {"cc_msb": "121", "nrpn_lsb": 1, "nrpn_msb": 58},
+            "midi": {"nrpn_lsb": 1, "nrpn_msb": 58},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -375,7 +381,7 @@ def test_lfo3_all_params():
             "options": None,
         },
         "MULT": {
-            "midi": {"cc_msb": "122", "nrpn_lsb": 1, "nrpn_msb": 59},
+            "midi": {"nrpn_lsb": 1, "nrpn_msb": 59},
             "max_midi_value": 11,
             "min_midi_value": 0,
             "max_value": 2000,
@@ -384,7 +390,7 @@ def test_lfo3_all_params():
             "options": None,
         },
         "FADE": {
-            "midi": {"cc_msb": "123", "nrpn_lsb": 1, "nrpn_msb": 60},
+            "midi": {"nrpn_lsb": 1, "nrpn_msb": 60},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 63,
@@ -393,7 +399,7 @@ def test_lfo3_all_params():
             "options": None,
         },
         "DEST": {
-            "midi": {"cc_msb": "124", "nrpn_lsb": 1, "nrpn_msb": 61},
+            "midi": {"nrpn_lsb": 1, "nrpn_msb": 61},
             "max_midi_value": 50,
             "min_midi_value": 25,
             "max_value": 50,
@@ -458,7 +464,7 @@ def test_lfo3_all_params():
             ],
         },
         "WAVE": {
-            "midi": {"cc_msb": "125", "nrpn_lsb": 1, "nrpn_msb": 62},
+            "midi": {"nrpn_lsb": 1, "nrpn_msb": 62},
             "max_midi_value": 6,
             "min_midi_value": 0,
             "max_value": 6,
@@ -467,7 +473,7 @@ def test_lfo3_all_params():
             "options": ["tri", "sine", "sqr", "saw", "expo", "ramp", "rand"],
         },
         "SPH": {
-            "midi": {"cc_msb": "126", "nrpn_lsb": 1, "nrpn_msb": 70},
+            "midi": {"nrpn_lsb": 1, "nrpn_msb": 70},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -476,7 +482,7 @@ def test_lfo3_all_params():
             "options": None,
         },
         "MODE": {
-            "midi": {"cc_msb": "127", "nrpn_lsb": 1, "nrpn_msb": 71},
+            "midi": {"nrpn_lsb": 1, "nrpn_msb": 71},
             "max_midi_value": 4,
             "min_midi_value": 0,
             "max_value": 4,
@@ -485,7 +491,7 @@ def test_lfo3_all_params():
             "options": ["free", "trig", "hold", "one", "half"],
         },
         "DEP": {
-            "midi": {"cc_msb": "128", "nrpn_lsb": 1, "nrpn_msb": 72},
+            "midi": {"nrpn_lsb": 1, "nrpn_msb": 72},
             "max_midi_value": 127,
             "min_midi_value": 0,
             "max_value": 127,
@@ -503,10 +509,13 @@ def test_lfo3_all_params():
         assert param_name in actual_params, f"Missing parameter: {param_name}"
         param = actual_params[param_name]
 
-        # Verify all fields match
-        assert (
-            param.midi.cc_msb == expected_values["midi"]["cc_msb"]
-        ), f"Mismatch in {param_name} cc_msb"
+        # Verify all fields match. LFO 3 carries no CC, so the expectation
+        # is that it stays absent rather than reappearing.
+        assert expected_values["midi"].get("cc_msb") is None
+        assert not param.midi.cc_msb, (
+            f"{param_name} has CC {param.midi.cc_msb}, but LFO 3 is "
+            f"NRPN-only"
+        )
         assert (
             param.midi.nrpn_lsb == expected_values["midi"]["nrpn_lsb"]
         ), f"Mismatch in {param_name} nrpn_lsb"

@@ -20,6 +20,9 @@ def _known_cc() -> dict[int, list[str]]:
     index: dict[int, list[str]] = {}
     for section, params in SECTIONS.items():
         for ident, spec in params.items():
+            if "cc_msb" not in spec:
+                # NRPN-only, so no incoming CC can correspond to it.
+                continue
             index.setdefault(int(spec["cc_msb"]), []).append(f"{section}.{ident}")
     return index
 

@@ -57,7 +57,9 @@ def register_reference_tools(mcp, midi):
         table = {}
         for ident, spec in SECTIONS[section].items():
             entry = {
-                "cc": int(spec["cc_msb"]),
+                "cc": int(spec["cc_msb"]) if "cc_msb" in spec else None,
+                "nrpn": (f'{int(spec["nrpn_lsb"])}:{int(spec["nrpn_msb"])}'
+                         if "nrpn_msb" in spec else None),
                 "label": spec.get("_label", ident),
                 "page": spec.get("_page"),
                 "midi_range": [spec.get("min_midi", 0), spec.get("max_midi", 127)],

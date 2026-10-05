@@ -80,7 +80,11 @@ def create_parameter_group(params_dict):
     """Helper function to create a parameter group from a dictionary"""
     parameters = {}
     for key, value in params_dict.items():
-        if isinstance(value, dict) and ("cc" in value or "cc_msb" in value):
+        # An NRPN-only parameter is still a parameter, not a group of
+        # them -- the Digitone II's LFO 3 has no CC at all.
+        if isinstance(value, dict) and (
+            "cc" in value or "cc_msb" in value or "nrpn_msb" in value
+        ):
             # This is a parameter definition
             parameters[key] = create_param_from_dict(value)
         elif isinstance(value, dict):
