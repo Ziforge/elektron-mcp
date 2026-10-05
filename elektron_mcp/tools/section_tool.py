@@ -20,6 +20,11 @@ from typing import Optional
 from elektron_mcp.digitone.data.sections import SECTIONS, MACHINE_SECTIONS
 from elektron_mcp.patches.store import TRACK_STATE
 
+# Extra guidance per section, merged in by register_section_tools so a second
+# device can explain its own quirks (which channel to use, what is machine
+# dependent) without this module knowing about that device.
+SECTION_NOTES: dict[str, str] = {}
+
 MACHINE_NOTE = {
     "fm_drum": "FM DRUM",
     "fm_tone": "FM TONE",
@@ -56,7 +61,9 @@ def _build_docstring(section: str, params: dict) -> str:
     head = f"Set any number of {section} parameters on one track in a single call."
 
     pre = ""
-    if section in MACHINE_SECTIONS:
+    if section in SECTION_NOTES:
+        pre = f"\n    {SECTION_NOTES[section]}\n"
+    elif section in MACHINE_SECTIONS:
         pre = (
             f"\n    Requires the track's machine to be set to {MACHINE_NOTE[section]} "
             "on the device first; machine selection has no MIDI CC. Sending these "
@@ -125,7 +132,10 @@ def to_midi_value(spec: dict, value) -> tuple[Optional[int], Optional[str]]:
 
 
 def _send(midi, spec: dict, track: int, midi_value: int, use_nrpn: bool) -> bool:
-    if use_nrpn:
+    # Not every parameter map carries NRPN numbers -- maps transcribed from
+    # Cirklon instrument definitions have CC only -- so the request is
+    # honoured when possible and silently degrades to CC when not.
+    if use_nrpn and "nrpn_msb" in spec and "nrpn_lsb" in spec:
         # NRPN is 14-bit; scale the 7-bit value up so the two paths agree.
         if midi.send_nrpn(
             track, int(spec["nrpn_msb"]), int(spec["nrpn_lsb"]), midi_value << 7
@@ -133,6 +143,9 @@ def _send(midi, spec: dict, track: int, midi_value: int, use_nrpn: bool) -> bool
             return True
         # Fall back rather than fail: not every parameter answers to NRPN.
     return midi.send_cc(track, int(spec["cc_msb"]), midi_value)
+
+
+ALL_SECTIONS: dict[str, dict] = dict(SECTIONS)
 
 
 def _apply(
@@ -143,7 +156,7 @@ def _apply(
     units: str = "midi",
     use_nrpn: bool = False,
 ) -> dict:
-    params = SECTIONS[section]
+    params = ALL_SECTIONS[section]
 
     if not 1 <= track <= 16:
         return {"error": f"track must be 1-16, got {track}", "sent": {}, "failed": []}
@@ -186,10 +199,10 @@ def apply_sections(
     """Send a whole multi-section snapshot to a track. Used by patch recall."""
     summary = {"track": track, "sections": {}, "unknown": {}}
     for section, values in sections.items():
-        if section not in SECTIONS:
+        if section not in ALL_SECTIONS:
             summary["unknown"][section] = "unknown section"
             continue
-        known = {k: v for k, v in values.items() if k in SECTIONS[section]}
+        known = {k: v for k, v in values.items() if k in ALL_SECTIONS[section]}
         unknown = sorted(set(values) - set(known))
         if unknown:
             summary["unknown"][section] = unknown
@@ -222,9 +235,22 @@ def _make_tool(midi, section: str, params: dict):
     return namespace[f"set_{section}"]
 
 
-def register_section_tools(mcp, midi):
-    """Register one batch parameter tool per section with the MCP server."""
-    for section, params in SECTIONS.items():
+def register_section_tools(mcp, midi, sections: dict | None = None,
+                           notes: dict | None = None):
+    """Register one batch parameter tool per section with the MCP server.
+
+    Args:
+        mcp: The MCP server instance.
+        midi: The MIDI interface.
+        sections: Parameter registry to expose. Defaults to the Digitone II
+            sections; another device passes its own.
+        notes: Optional {section: guidance} merged into tool docstrings.
+    """
+    registry = SECTIONS if sections is None else sections
+    if notes:
+        SECTION_NOTES.update(notes)
+    ALL_SECTIONS.update(registry)
+    for section, params in registry.items():
         mcp.tool()(_make_tool(midi, section, params))
 
     @mcp.tool()
@@ -246,14 +272,14 @@ def register_section_tools(mcp, midi):
         Returns:
             dict: The value sent, or the available options on failure.
         """
-        if section not in SECTIONS:
+        if section not in ALL_SECTIONS:
             return {"error": f"unknown section {section!r}",
-                    "available": sorted(SECTIONS)}
-        if parameter not in SECTIONS[section]:
+                    "available": sorted(ALL_SECTIONS)}
+        if parameter not in ALL_SECTIONS[section]:
             return {"error": f"{section} has no parameter {parameter!r}",
-                    "available": sorted(SECTIONS[section])}
+                    "available": sorted(ALL_SECTIONS[section])}
 
-        spec = SECTIONS[section][parameter]
+        spec = ALL_SECTIONS[section][parameter]
         options = spec.get("options")
         if not isinstance(options, dict):
             return {

@@ -16,6 +16,7 @@ from elektron_mcp.tools.reference_tool import register_reference_tools
 from elektron_mcp.tools.audition_tool import register_audition_tools
 from elektron_mcp.tools.patch_tool import register_patch_tools
 from elektron_mcp.tools.learn_tool import register_learn_tools
+from elektron_mcp.rytm.data import RYTM_SECTIONS, RYTM_NOTES
 
 
 # Initialize MCP and MIDI
@@ -42,6 +43,10 @@ register_audition_tools(mcp, midi)
 register_patch_tools(mcp, midi)
 # MIDI learn: let the hardware say what it actually emits.
 register_learn_tools(mcp, midi)
+
+# Analog Rytm MKII: same batch-tool machinery over its own parameter map.
+# Tracks are MIDI channels 1-12, FX is channel 13, performance macros are 14.
+register_section_tools(mcp, midi, RYTM_SECTIONS, RYTM_NOTES)
 
 # Export the configured MCP server
 __all__ = ["mcp"]
