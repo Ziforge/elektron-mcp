@@ -103,3 +103,32 @@ def test_play_and_reference_tools_registered():
                  "all_notes_off", "set_program", "list_sections",
                  "get_param_reference"):
         assert name in tools, f"{name} not registered"
+
+
+def test_lfo_destination_enum_is_shared_across_lfos():
+    """LFO1 and LFO2 agree on every destination they share, which is why
+    LFO3 can inherit the enumeration rather than needing its own."""
+    from elektron_mcp.digitone.data.lfo import (
+        LFO1_PARAMS, LFO2_PARAMS, LFO3_PARAMS,
+    )
+
+    o1 = LFO1_PARAMS["DEST"]["options"]
+    o2 = LFO2_PARAMS["DEST"]["options"]
+    o3 = LFO3_PARAMS["DEST"]["options"]
+
+    assert [k for k in o1 if k in o2 and o1[k] != o2[k]] == []
+    assert o3 and all(0 <= v <= 127 for v in o3.values())
+    # LFO1's own parameters are addressable as destinations at their LFO page
+    # slot index, with slot 4 (DEST itself) excluded.
+    assert sorted(v for k, v in o3.items() if k.startswith("lfo1_")) == [
+        1, 2, 3, 5, 6, 7, 8
+    ]
+
+
+def test_lfo3_lfo2_targets_remain_an_explicit_gap():
+    """Appendix D says LFO3 can target LFO2's parameters. Those values are
+    not known, so they must stay absent rather than be guessed."""
+    from elektron_mcp.digitone.data.lfo import LFO3_PARAMS
+
+    o3 = LFO3_PARAMS["DEST"]["options"]
+    assert [k for k in o3 if k.startswith("lfo2_")] == []

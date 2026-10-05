@@ -1,5 +1,3 @@
-import pytest
-
 from elektron_mcp.digitone.config.config import digitone_config
 
 
@@ -364,12 +362,6 @@ def test_lfo2_all_params():
     ), "Extra parameters found"
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="LFO3 DEST has no destination enum in data/lfo.py; needs the "
-    "destination table from the Digitone II manual. Remove this marker once "
-    "it is populated.",
-)
 def test_lfo3_all_params():
     """Test all parameters in LFO3"""
     expected_params = {

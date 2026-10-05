@@ -244,7 +244,17 @@ LFO3_PARAMS = {
         "max_val": 50,
         "min_val": 25,
         "default": "none",
-        "options": None,
+        # LFO1 and LFO2 agree on the value of every destination they share,
+        # so this is one global destination enumeration rather than a
+        # per-LFO one, and LFO3 inherits it.
+        #
+        # Deliberately incomplete: per Appendix D of the manual, LFO3 can
+        # also target LFO2's own parameters, and those entries are absent
+        # because their values are not known. The LFO1 targets sit at 1-8
+        # with 4 skipped, which is the LFO page slot index with DEST (slot 4)
+        # excluded, so the LFO2 targets plausibly follow the same shape --
+        # but that is an inference, not a measurement, so it is not encoded.
+        "options": dict(LFO2_PARAMS["DEST"]["options"]),
     },
     "WAVE": {
         "cc_msb": 125,
