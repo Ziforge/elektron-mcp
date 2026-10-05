@@ -217,3 +217,62 @@ After that, single-variable probes found the mechanism in four uploads.
   length; each needs one calibration save.
 - A value going to zero is raised to 1 unless the template already holds zero.
 - The header is templated from a real preset rather than synthesised.
+
+## Offset sweep: classifying every byte automatically
+
+Writing a probe value to one offset at a time and observing the device's
+response classifies each byte with no interaction with the device. A
+rejection identifies that single offset as structural instead of poisoning a
+whole batch -- writing 43 offsets at once is refused outright with "Failed to
+decompress block", and so is a batch of six.
+
+Each offset falls into one of five classes:
+
+| response | meaning |
+|---|---|
+| value preserved | parameter, unconstrained |
+| value clamped | parameter, and the clamp reveals its maximum |
+| value reverted | byte is ignored |
+| upload refused | structural: block framing |
+| payload length changed | parameter stored at variable width |
+
+### Result for offsets 145-229
+
+Named by cross-referencing each byte's original value against the calibration
+ground truth, with position resolving what value-search alone could not:
+
+| offset | parameter | | offset | parameter |
+|---|---|---|---|---|
+| 183 | amp.atk | | 197 | fx.rev |
+| 185 | amp.hold | | 199 | amp.pan |
+| 187 | amp.dec | | 201 | amp.vol *(variable width)* |
+| 189 | amp.sus | | 209 | fx.br |
+| 191 | amp.rel | | 211 | fx.srr *(variable width)* |
+| 193 | fx.chr | | 215 | fx.over *(variable width)* |
+| 195 | fx.del_ | | | |
+
+43 of roughly 80 Sound parameters are now located.
+
+The three FX sends sitting inside the amp block matches the device's own AMP
+page, where the sends live, so the payload follows the UI rather than the CC
+numbering -- as it does for FM DRUM.
+
+### Also established
+
+- **Structural offsets** (block framing, writes refused): 147, 149, 169, 173,
+  181, 203, 217, 223, 229.
+- **Variable-width parameters**: amp.vol, fx.srr, fx.over. Writing these
+  shifts the payload, so they need read-back verification; the other 40 do
+  not.
+- **Offset 221 clamps to 80**, and no parameter in this repo's maps has an 80
+  maximum. Probably a Digitone II parameter the CC-derived maps predate.
+- **Offsets 151-177** accept writes but held all zeros: the calibration never
+  set them, so this is most likely the LFO block, which was not included.
+- Offset 179 is ignored entirely -- written values revert.
+
+### Still ambiguous
+
+Offsets 203-207, 213, 219, 225 and 227. Their original values were 0 or 1,
+shared by five 0/1 toggle parameters, so neither value-search nor clamping
+separates them. A calibration with distinct values in a high, rare range
+resolves them in one save.
