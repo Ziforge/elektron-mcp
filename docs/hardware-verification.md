@@ -8,7 +8,7 @@ measures whether the sound moved. `tools/merge_sweeps.py` combines passes.
 `tools/check_key_tracking.py` covers the one parameter a single-note sweep
 cannot reach.
 
-## Digitone II: 112 of 146 distinct addresses verified
+## Digitone II: 118 of 146 distinct addresses verified
 
 Counted by address rather than by parameter, because the machines share
 their CC numbers: an unverified machine parameter is usually an address
@@ -27,7 +27,7 @@ which understates it for that reason.
 | `send_chorus` | 7/7 |
 | `master` | 1/1 |
 | `filter_base_width` | 4/5 |
-| `compressor` | 4/9 |
+| `compressor` | 9/9 |
 | `trig` | 1/7 |
 | `track` | 1/2 |
 
@@ -55,14 +55,10 @@ for structural reasons, not for want of effort:
   playing at full level. Both numbers are from Appendix C, so the map
   matches the manual; the manual is not reproducible here. Recorded as a
   discrepancy rather than a pending task.
-- **`compressor`, 5 addresses.** The compressor does not engage on the test
-  material, so its threshold, attack, release, ratio and sidechain source
-  have nothing to act on. Closable with a hotter, more sustained signal.
-- **CC 60 and 61.** Only FM TONE and WAVETONE reach these two slots and
-  track 14 runs FM DRUM; the machine cannot be set over MIDI. Track 1 does
-  respond on both -- d 1.85 and 1.78 -- but against a floor of 1.57, so
-  suggestive rather than settled. Closable on track 1 with a stabilised
-  patch.
+- **CC 61.** On WAVETONE this is noise WDTH, and track 1 -- the only track
+  reaching these slots -- runs WAVETONE. Measuring the width of a noise
+  source against the noise it makes does not separate from its own floor:
+  0.22 against a bar of 0.35 with the noise up. CC 60 verified at 0.14.
 - **`filter_base_width.env_reset`.** Acts on a new trig by definition, so
   it needs two notes in succession.
 
@@ -83,6 +79,29 @@ numbers rather than the 183 parameters a naive count suggests.
 What stays unverified is the per-machine naming, which audio cannot
 establish in principle -- a knob slot responds identically whatever it is
 called. That comes from Appendix A, or from the device's own knobs.
+
+## Two facts about the instrument this turned up
+
+**The compressor only compresses with the sidechain source at 0.** With it
+at 127 the threshold, attack, release and ratio all read as doing nothing,
+because the compressor never engages -- so there is nothing for them to act
+on. With the source at 0 every one of them responds immediately: threshold
+0.30, ratio 0.63, attack 0.31, release 0.49. Five addresses that looked
+dead were one setting away from obvious, and the clue was the sidechain
+source itself being the only compressor control that responded.
+
+**LFO 3 escapes every CC-based stabilisation, because it has no CC.** Track
+1 measured a floor of 6.84 against itself -- as different from itself as an
+unrelated sound -- with LFO 1 and LFO 2 silenced by CC and LFO 3 left free
+running. Zeroing its depth over NRPN 1:72 took the floor to 0.045, a
+150-fold improvement, and made the track measurable at all. Anything that
+needs a repeatable voice has to silence LFO 3 over NRPN.
+
+A related trap: CC 62 and 63 cannot be stabilised generically. They are
+oscillator reset on FM DRUM but noise type and character on WAVETONE, so
+setting them blindly steadies one machine and destabilises another --
+setting them raised track 1's floor from 0.045 to 0.21 by switching its
+noise on.
 
 ## The send effects, checked by their physics
 
