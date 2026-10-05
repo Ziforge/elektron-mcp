@@ -90,6 +90,13 @@ def main():
     ap.add_argument("--bpm", type=float, default=120.0)
     ap.add_argument("--bars", type=float, default=2.0)
     ap.add_argument("--repeats", type=int, default=5)
+    ap.add_argument("--min-gap-ms", type=float, default=80.0,
+                    help="shortest gap counted as two trigs. The default "
+                         "of 12 in rig-audio counts a drum's transient and "
+                         "its body separately -- against known note counts "
+                         "it returned 16, 32 and 48 for 4, 8 and 16 notes. "
+                         "Anywhere from 60 to 100 is exact; 140 starts "
+                         "merging real trigs at 125 ms spacing")
     ap.add_argument("--hold", action="append", default=[],
                     metavar="SECTION.PARAM=VALUE",
                     help="held for every count. The euclidean generators "
@@ -138,7 +145,8 @@ def main():
         audio, sr = rec.finish()
         port.send(mido.Message("stop"))
         mono = audio.mean(axis=1) if audio.ndim > 1 else audio
-        return onset_count(mono, sr), (describe(audio, sr).get("rms") or 0.0)
+        return (onset_count(mono, sr, min_gap_ms=args.min_gap_ms),
+                describe(audio, sr).get("rms") or 0.0)
 
     held_values = []
     for item in args.hold:
@@ -158,14 +166,22 @@ def main():
             send(spec, value)
             print(f"  holding {target} = {value}")
         time.sleep(0.2)
+        steps = int(args.bars * 16)
         print(f"{args.bars:.0f} bars at {args.bpm:.0f} BPM "
-              f"({seconds:.1f}s per capture)\n")
+              f"({seconds:.1f}s per capture), onsets no closer than "
+              f"{args.min_gap_ms:.0f}ms")
+        print(f"  a 16-step pattern can hold at most {steps} trigs in "
+              f"that window\n")
 
         base = [count() for _ in range(args.repeats)]
         counts = [n for n, _ in base]
         level = statistics.fmean(r for _, r in base)
         spread = max(counts) - min(counts)
         print(f"unchanged pattern: {counts} trigs, rms {level:.4f}")
+        if max(counts) > steps * 1.3:
+            print("  counting more trigs than the pattern can hold, so "
+                  "the counter is over-firing on this material -- raise "
+                  "--min-gap-ms before trusting anything below")
         if level < 0.004:
             print("the pattern is silent; nothing to count")
             return 1

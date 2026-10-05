@@ -40,9 +40,14 @@ Reproduce with:
 Only three of the 34 are open questions. The rest are unreachable by audio
 for structural reasons, not for want of effort:
 
-- **`external_in`, 11 addresses.** They control the external audio inputs
-  and nothing is plugged in. Correctly silent; this is the map being right,
-  not unverified.
+- **`external_in`, 11 addresses.** These control the *analog* inputs, and
+  nothing is plugged into them. Feeding audio in over USB does not reach
+  them: USB audio is a separate path governed by USB TO MAIN, a menu
+  setting with no CC, and even with it up the external input mixer would
+  not be in that path. Playing noise into the device and raising the input
+  levels over MIDI moved the output from 0.00001 to 0.00004, which is the
+  noise floor. These need a cable in the back of the unit; they are
+  correctly silent, which is the map being right rather than unverified.
 - **`trig` 6 and `euclid` 7.** Sequencer-domain: they govern what a
   pattern plays, and an incoming MIDI note bypasses them. Two methods were
   tried and both exhausted. Driving the device's own sequencer works -- it
@@ -58,17 +63,24 @@ for structural reasons, not for want of effort:
   count beyond its noise -- ranges of 1 to 6 against a spread of 4. So the
   euclidean parameters are not reaching the device at all.
 
-  All seven are NRPN bank 3, and bank 3 has never been shown to work.
-  Bank 1 has: LFO 3 responds on 1:72. The one bank-3 parameter that is
-  audible in principle is portamento, CC 9 and 65 with NRPN 3:6 and 3:7,
-  which glides pitch between two different notes -- but it reads 0.29 to
-  0.34 against a 0.54 bar on FM DRUM, where portamento may simply do
-  nothing. Bank 3 therefore remains unproven rather than disproven, and it
-  is the single most valuable thing left to settle: if the bank and
-  parameter numbers are the wrong way round for bank 3 as they were for
-  the fields generally, that is a real defect across 13 addresses.
+  NRPN bank 3 is not accepted over MIDI. That is now established rather
+  than suspected, by elimination:
+
+  - Bank 1 works: LFO 3 depth responds on 1:72.
+  - Bank 2 works, and provably so: the same parameter reached by CC and by
+    NRPN gives the same answer. Reverb mix is 3.5731 by CC 92 and 3.5673
+    by NRPN 2:15; reverb decay 3.5787 by CC 30 and 3.6448 by NRPN 2:9. So
+    the field ordering, the data-entry encoding and the channel handling
+    are all correct.
+  - Bank 3 gives nothing, on the track's channel and on the auto channel,
+    with euclid mode held on and with a validated trig counter.
+
+  The auto channel was found by probing, not assumed: amplitude volume
+  sent to each channel in turn silenced the active track only on channel
+  10. So the configuration here is tracks on their own channels, FX
+  control on 9, auto on 10.
 - **The two mutes, CC 94 and CC 110.** Confirmed non-functional over MIDI
-  by two independent methods. Spectrally, muting every track leaves the
+  by three independent measurements. Spectrally, muting every track leaves the
   level unchanged; by trig count, a muted track still fires 27, 24 and 28
   trigs where a working mute would fire none. Neither CC nor NRPN 1:108
   has any effect. Both numbers are from Appendix C, so the map matches the
