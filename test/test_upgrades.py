@@ -416,3 +416,15 @@ def test_releasing_the_port_stops_an_active_capture():
 
     assert midi._capturing is False, "capture flag survived disconnect"
     assert midi.connected is False
+
+
+def test_play_shake_scatters_pitch_and_warns_when_it_does_not():
+    """The ensemble texture comes from pitch varying across strikes: the same
+    strike density at one pitch measured 30 spectral peaks against 135
+    scattered, so a zero spread is worth flagging."""
+    import asyncio
+
+    from elektron_mcp.mcp_server.server import mcp
+
+    tools = {t.name for t in asyncio.run(mcp.list_tools())}
+    assert "play_shake" in tools

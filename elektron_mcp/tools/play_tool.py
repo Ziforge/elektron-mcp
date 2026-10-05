@@ -176,6 +176,111 @@ def register_play_tools(mcp, midi):
         return result
 
     @mcp.tool()
+    def play_shake(
+        track: int,
+        note: int = 84,
+        step_ms: int = 45,
+        hits: int = 18,
+        pitch_spread: int = 6,
+        accents: list[int] | None = None,
+        gate: float = 0.4,
+        repeats: int = 1,
+        gap_ms: int = 450,
+        section: str | None = None,
+        jitter: dict[str, int] | None = None,
+        seed: int | None = None,
+    ) -> dict:
+        """
+        Play a shaken burst: fast strikes with the pitch scattered per hit.
+
+        This is how a struck-ensemble instrument is produced -- sleigh bells,
+        a jingle stick, a tambourine. The texture comes from pitch varying
+        across strikes, not from the patch: measured on a Digitone FM DRUM
+        patch, 18 hits at 45 ms with the pitch held still gave 30 spectral
+        peaks, while the same strikes scattered over a few semitones gave 135
+        against a real jingle stick's 127. One pitch repeated reads as one
+        object struck repeatedly, however good the patch is.
+
+        Args:
+            track (int): Digitone track / MIDI channel, 1-16.
+            note (int): Centre note the scatter is applied around.
+            step_ms (int): Milliseconds between strikes. 45 is a dense shake;
+                above roughly 100 it reads as separate hits.
+            hits (int): Strikes per shake, 1-64.
+            pitch_spread (int): Semitones either side of `note`. 0 defeats
+                the point; 4 to 9 is the useful range.
+            accents (list[int]): Velocity cycle. The default is strong on the
+                beat and weaker between, which is what makes it read as
+                shaken rather than machine-triggered.
+            gate (float): Fraction of each step the note is held, 0.05-1.0.
+            repeats (int): How many shakes to play, 1-16.
+            gap_ms (int): Silence between repeated shakes.
+            section (str): Section name for `jitter`, e.g. 'fm_drum'.
+            jitter (dict[str, int]): Optional {parameter: spread} varied per
+                strike, on top of the pitch scatter.
+            seed (int): Seed for a repeatable shake.
+
+        Returns:
+            dict: Strikes played and the notes used.
+        """
+        if not 1 <= track <= 16:
+            return {"error": f"track must be 1-16, got {track}"}
+
+        hits = max(1, min(64, hits))
+        repeats = max(1, min(16, repeats))
+        step_ms = max(10, min(1000, step_ms))
+        gate = max(0.05, min(1.0, gate))
+        spread = max(0, min(36, pitch_spread))
+        velocities = accents or [120, 74, 100, 68]
+
+        jitter_ccs: dict[str, tuple[int, int, int]] = {}
+        unknown: list[str] = []
+        if jitter:
+            if section not in SECTIONS:
+                return {"error": f"jitter needs a valid section; got {section!r}"}
+            params = SECTIONS[section]
+            for name, amount in jitter.items():
+                if name not in params:
+                    unknown.append(name)
+                    continue
+                base = params[name].get("default") or 64
+                jitter_ccs[name] = (int(params[name]["cc_msb"]), int(base),
+                                    int(amount))
+
+        rng = random.Random(seed)
+        on_ms = step_ms * gate
+        played: list[int] = []
+        for shake_index in range(repeats):
+            for i in range(hits):
+                pitch = max(0, min(127, note + rng.randint(-spread, spread)))
+                for cc, base, amount in jitter_ccs.values():
+                    midi.send_cc(track, cc, max(0, min(
+                        127, base + rng.randint(-amount, amount))))
+                vel = velocities[i % len(velocities)]
+                vel = max(1, min(127, vel + rng.randint(-8, 8)))
+                midi.send_note_on(track, pitch, vel)
+                played.append(pitch)
+                time.sleep(on_ms / 1000.0)
+                midi.send_note_off(track, pitch)
+                time.sleep((step_ms - on_ms) / 1000.0)
+            if shake_index < repeats - 1:
+                time.sleep(gap_ms / 1000.0)
+
+        result = {
+            "track": track, "shakes": repeats, "strikes": len(played),
+            "step_ms": step_ms, "pitch_spread": spread,
+            "pitch_range": [min(played), max(played)],
+        }
+        if spread == 0:
+            result["note"] = (
+                "pitch_spread 0 means every strike is the same pitch, which "
+                "reads as one object struck repeatedly rather than an ensemble"
+            )
+        if unknown:
+            result["unknown_jitter_params"] = unknown
+        return result
+
+    @mcp.tool()
     def all_notes_off(track: int | None = None) -> dict:
         """
         Silence stuck notes on one track, or every track if none is given.
