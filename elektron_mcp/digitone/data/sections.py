@@ -98,6 +98,60 @@ def _flatten(params: dict) -> dict:
     return flat
 
 
+# Six-character labels for the Cirklon's display, keyed by
+# "section.identifier".
+#
+# Most are the name the device itself shows, taken from Appendix A of the
+# manual, where this map had stored a longer descriptive form instead: the
+# amp and filter envelope resets are RSET on screen, not "Env. RSET"; the
+# FX routings are SR.RT and OD.RT without the "(pre/post)" gloss; the
+# filter envelope depth is ENV.
+#
+# The FM TONE page 4 entries and a few prefixed pairs are abbreviated here
+# rather than quoted: the manual groups page 4 as a single heading, "RATIO
+# OFFSET C, A, B1, B2", so it gives no per-knob name to copy, and the
+# Cirklon needs one label per CC.
+CKI_LABELS = {
+    # From the manual. These four were stored lowercase.
+    "fm_drum.tune": "TUNE",
+    "fm_drum.stim": "STIM",
+    "fm_drum.sdep": "SDEP",
+    "fm_drum.algo": "ALGO",
+    "amp.env_rset": "RSET",
+    "fx.sr_rt": "SR.RT",
+    "fx.od_rt": "OD.RT",
+    "filter_multi_mode.env_depth": "ENV",
+    "filter_lowpass4.env_depth": "ENV",
+    "filter_equalizer.env_depth": "ENV",
+    "filter_legacy_lp_hp.env_depth": "ENV",
+    "filter_comb_minus.env_depth": "ENV",
+    "filter_comb_plus.env_depth": "ENV",
+    "filter_legacy_lp_hp.type": "TYPE",
+    "filter_base_width.env_reset": "RSET",
+    "filter_base_width.env_delay": "DELAY",
+    "filter_base_width.key_tracking": "KEY",
+    # Abbreviated, keeping each label distinct within its section.
+    "fm_tone.ratio_offset_c": "OFS.C",
+    "fm_tone.ratio_offset_a": "OFS.A",
+    "fm_tone.ratio_offset_b1": "OFS.B1",
+    "fm_tone.ratio_offset_b2": "OFS.B2",
+    "fm_tone.key_track_a": "KEY.A",
+    "fm_tone.key_track_b1": "KEY.B1",
+    "fm_tone.key_track_b2": "KEY.B2",
+    "trig.fltr_trig": "FLTR",
+    "trig.lfo_trig": "LFO",
+    "trig.port_time": "PRT.T",
+    "trig.port_on": "PRT.ON",
+    "misc.pat_mute": "PATMUT",
+    "compressor.pat_vol": "PATVOL",
+    "external_in.l_chorus": "L.CHR",
+    "external_in.r_chorus": "R.CHR",
+    "external_in.l_delay": "L.DLY",
+    "external_in.r_delay": "R.DLY",
+    "external_in.l_reverb": "L.REV",
+    "external_in.r_reverb": "R.REV",
+}
+
 SECTIONS: dict[str, dict] = {
     "fm_drum": _flatten(FM_DRUM_PARAMS),
     "fm_tone": _flatten(FM_TONE_PARAMS),
@@ -129,6 +183,13 @@ SECTIONS: dict[str, dict] = {
     "external_in": _flatten(EXTERNAL_IN_PARAMS),
     "master": _flatten(MASTER_PARAMS),
 }
+
+for _key, _label in CKI_LABELS.items():
+    _section, _, _ident = _key.partition(".")
+    _spec = SECTIONS.get(_section, {}).get(_ident)
+    if _spec is not None:
+        _spec["cki_label"] = _label
+
 
 # Sections addressed on the FX CONTROL CH rather than a track's channel
 # (SETTINGS > MIDI CONFIG > CHANNELS). Passing a track number to these
