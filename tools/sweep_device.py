@@ -161,6 +161,9 @@ LOCK_PATH = os.path.join(os.path.expanduser("~"), ".elektron-mcp",
                          "sweep.lock")
 SILENCE_PEAK = 0.004
 SILENCE_TRIES = 14
+# Long enough for the output to settle after All Sound Off, short enough
+# that a sweep of a few hundred probes does not crawl.
+SETTLE_AFTER_SILENCE = 0.12
 # An unchanged patch should measure close to itself. Much above this and
 # the baseline is not stable enough to measure anything against -- a
 # near-closed filter or a near-silent envelope gives an unstable log-STFT,
@@ -436,7 +439,15 @@ def wait_for_silence(audio_device, device=None):
     noise floor accounts for it.
     """
     if device is not None:
+        # All Sound Off cuts the note outright, ignoring release, so there
+        # is nothing to wait for and nothing to poll. Polling meant
+        # reopening the audio device up to SILENCE_TRIES times per capture
+        # -- over a thousand opens across a survey -- and CoreAudio
+        # eventually stopped handing it back at all, taking the run with
+        # it.
         device.silence()
+        time.sleep(SETTLE_AFTER_SILENCE)
+        return True
     failures = 0
     for _ in range(SILENCE_TRIES):
         try:

@@ -247,3 +247,27 @@ def test_set_in_resolves_the_channel_from_the_section():
     device.set_in("compressor", {"cc_msb": 119}, 0)
 
     assert sent == [(13, 90, 100), (8, 119, 0)]
+
+
+def test_silence_is_asserted_rather_than_polled_when_possible():
+    """Polling reopened the audio device up to fourteen times per capture,
+    which across one survey is over a thousand opens; CoreAudio stopped
+    handing it back and the run died. All Sound Off cuts the note outright,
+    so there is nothing to wait for."""
+    calls = []
+
+    class FakeDevice:
+        def silence(self):
+            calls.append("silence")
+
+    def boom(*_args, **_kwargs):
+        raise AssertionError("the audio device must not be opened here")
+
+    import rig_audio.capture as cap
+    original = cap.record
+    sweep.record = boom
+    try:
+        assert sweep.wait_for_silence("whatever", FakeDevice()) is True
+    finally:
+        sweep.record = original
+    assert calls == ["silence"]

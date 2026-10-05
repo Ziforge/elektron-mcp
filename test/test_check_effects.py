@@ -145,3 +145,19 @@ def test_the_echo_search_reaches_past_a_second():
     measured = fx.echo_lag_ms(_echoes(1100, count=3, total_ms=4000), SR)
     assert measured is not None
     assert abs(measured - 1100) / 1100 < 0.1, measured
+
+
+def test_a_peak_on_the_search_edge_is_not_a_measurement():
+    """It is the envelope's own short-term self-similarity. Reporting it
+    took an otherwise perfectly linear delay -- 232, 507, 783, 1059 ms --
+    to a rank correlation of zero."""
+    rng = np.random.default_rng(5)
+    # Noise with no repeat structure at all.
+    noise = rng.standard_normal((int(2.0 * SR), 2)) * 0.1
+    measured = fx.echo_lag_ms(noise, SR, lo_ms=20.0)
+    assert measured is None or measured > 23.0
+
+
+def test_a_real_echo_well_inside_the_window_still_reads():
+    assert fx.echo_lag_ms(_echoes(300, count=4, total_ms=3000),
+                          SR) == pytest.approx(300, abs=30)
