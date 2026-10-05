@@ -8,7 +8,7 @@ a reference recording, and iterated on.
 
 import time
 
-from elektron_mcp.audio import analysis, capture
+from rig_audio import analysis, capture
 
 
 def _play(midi, track, note, velocity, duration_ms, tail_ms):

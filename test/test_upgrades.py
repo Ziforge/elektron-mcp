@@ -9,7 +9,7 @@ import mido
 import numpy as np
 import pytest
 
-from elektron_mcp.audio import analysis, capture
+from rig_audio import analysis, capture
 from elektron_mcp.digitone.data.sections import SECTIONS
 from elektron_mcp.patches import store
 from elektron_mcp.tools import section_tool
