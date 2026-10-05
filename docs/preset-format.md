@@ -160,44 +160,59 @@ the calibrated 271 bytes, and `save_current_as_preset` reads back what the
 device actually stored and reports whether the parameters survived, rather
 than trusting an accepted upload.
 
-## Why writing parameters is harder than it looked
+## Writing parameters: what the probes established
 
-The device does not store an uploaded payload verbatim. It parses and
-re-encodes it. Comparing a 271-byte upload with known values against the
-266 bytes the device returned for the same slot:
+Single-variable uploads to a scratch slot, each one verified by downloading
+what the device stored.
 
-| | |
-|---|---|
-| common prefix | 83 bytes |
-| common suffix | 4 bytes (the footer marker alone) |
-| parameter block | offsets 85-143, entirely inside the diverging region |
+**The round trip is lossless.** Uploading a preset byte-for-byte as the
+device supplied it returns the same 271 bytes with exactly one byte changed:
+offset 24, which behaves as a save counter. So any other difference is
+attributable to the edit, and the body is not re-encoded in general. An
+earlier version of this document concluded the opposite; that was wrong.
 
-The two bodies share recognisable runs, shifted and restructured, so this is
-a re-encoding rather than a localised edit. Both length fields and the hash
-were recomputed correctly by the device, and byte 24 behaves like a counter
-(incremented on save).
+**A non-zero write lands exactly.** Changing one parameter byte to a non-zero
+value returns the same length with that byte changed and nothing else moved
+(bar the CRC, which the device recomputes). The offsets are correct.
 
-The consequence: the 30 offsets decode the calibration preset because the
-*device produced it*. They do not describe the format, and they do not
-survive a round trip through the device. Two more calibration presets would
-not settle this -- the body appears to use a variable-length scheme, so
-pinning it means working out the encoding, not finding a landmark.
+**A zero costs one byte.** Writing 0 into a parameter returns a payload one
+byte shorter, with everything after that point shifted. Zeros are stored
+compactly rather than as a full 16-bit word. This is what made the first
+attempt fail: the patch contained five zero values and the device returned a
+payload exactly five bytes shorter.
 
-That is a genuine reverse-engineering project. It is feasible -- presets are
-small, the hash is solved so uploads are accepted, and the write-then-verify
-loop can test any hypothesis against the hardware -- but it is not a
-quick job, and nothing in this repo should pretend otherwise.
+**Substituting 1 for 0 is not sufficient.** Writing all 30 values with zeros
+replaced by 1 landed 26 of 30, including the whole of page 1, which had never
+worked before. Four drifted: ph_c came back as 0 despite being sent as 1, and
+the three parameters after it shifted by one slot -- consistent with ph_c
+being normalised to 0 and then stored compactly. So some parameters constrain
+or normalise their value, and a normalised 0 re-triggers the compaction.
+
+### State
+
+- 26 of 30 FM DRUM parameters are writable today.
+- The remaining few need one probe sweep each: write every value across the
+  parameter's range, see which are stored verbatim and which normalise.
+- At roughly fifteen seconds per probe this is bounded work, and the harness
+  does it reliably: upload, download, compare.
+
+### Method that worked
+
+Change exactly one thing per upload and verify against what the device
+stored. Five hypotheses were tested and rejected by inspection alone
+(checksum location, trailing footer hash, stored-deflate framing, zlib in the
+payload, wholesale re-encoding). None survived contact. The single-variable
+probe found the mechanism in two uploads.
 
 ## What works today
 
 - Download, back up, copy and clear presets and projects on the device.
-- Read a device-produced preset's parameters, for the calibrated payload
-  length.
+- Read a device-produced preset's parameters at the calibrated payload length.
 - Compute and reseal the content hash, so an edited preset is accepted.
-- `apply_parameters` refuses a payload of uncalibrated length, and
-  `save_current_as_preset` reads back what the device stored and reports
-  whether the parameters survived rather than trusting the upload.
+- Write non-zero parameter values, verified by read-back.
+- `apply_parameters` refuses an uncalibrated payload length, and
+  `save_current_as_preset` reports whether the parameters actually survived
+  rather than trusting an accepted upload.
 
-For keeping a sound, the patch store is the reliable route: it replays the
-parameter values over CC in about a second. Saving to a device slot still
-needs the five button presses on the Digitone.
+For keeping a sound, the patch store remains the reliable route: it replays
+the values over CC in about a second.
