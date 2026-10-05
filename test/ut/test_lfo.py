@@ -33,10 +33,10 @@ def test_lfo1_all_params():
         },
         "DEST": {
             "midi": {"cc_msb": "105", "nrpn_lsb": 1, "nrpn_msb": 45},
-            "max_midi_value": 50,
-            "min_midi_value": 25,
-            "max_value": 50,
-            "min_value": 25,
+            "max_midi_value": 99,
+            "min_midi_value": 0,
+            "max_value": 99,
+            "min_value": 0,
             "default_value": "none",
             "options": [
                 "none",
@@ -210,10 +210,10 @@ def test_lfo2_all_params():
         },
         "DEST": {
             "midi": {"cc_msb": "114", "nrpn_lsb": 1, "nrpn_msb": 53},
-            "max_midi_value": 50,
-            "min_midi_value": 25,
-            "max_value": 50,
-            "min_value": 25,
+            "max_midi_value": 99,
+            "min_midi_value": 0,
+            "max_value": 99,
+            "min_value": 0,
             "default_value": "none",
             "options": [
                 "LFO1: Speed",
@@ -400,10 +400,10 @@ def test_lfo3_all_params():
         },
         "DEST": {
             "midi": {"nrpn_lsb": 1, "nrpn_msb": 61},
-            "max_midi_value": 50,
-            "min_midi_value": 25,
-            "max_value": 50,
-            "min_value": 25,
+            "max_midi_value": 99,
+            "min_midi_value": 0,
+            "max_value": 99,
+            "min_value": 0,
             "default_value": "none",
             "options": [
                 "LFO1: Speed",

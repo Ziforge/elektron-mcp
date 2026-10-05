@@ -22,10 +22,12 @@ LFO1_PARAMS = {
         "cc_msb": 105,
         "nrpn_lsb": 1,
         "nrpn_msb": 45,
-        "max_midi": 50,
-        "min_midi": 25,
-        "max_val": 50,
-        "min_val": 25,
+        # Appendix D's destination list runs well past 50 -- the options
+        # below reach 99 -- so the old 25-50 window excluded most of them.
+        "max_midi": 99,
+        "min_midi": 0,
+        "max_val": 99,
+        "min_val": 0,
         "default": "none",
         "options": {
             "none": 0,
@@ -127,10 +129,12 @@ LFO2_PARAMS = {
         "cc_msb": 114,
         "nrpn_lsb": 1,
         "nrpn_msb": 53,
-        "max_midi": 50,
-        "min_midi": 25,
-        "max_val": 50,
-        "min_val": 25,
+        # Appendix D's destination list runs well past 50 -- the options
+        # below reach 99 -- so the old 25-50 window excluded most of them.
+        "max_midi": 99,
+        "min_midi": 0,
+        "max_val": 99,
+        "min_val": 0,
         "default": "none",
         "options": {
             "none": 0,
@@ -243,10 +247,12 @@ LFO3_PARAMS = {
     "DEST": {
         "nrpn_lsb": 1,
         "nrpn_msb": 61,
-        "max_midi": 50,
-        "min_midi": 25,
-        "max_val": 50,
-        "min_val": 25,
+        # Appendix D's destination list runs well past 50 -- the options
+        # below reach 99 -- so the old 25-50 window excluded most of them.
+        "max_midi": 99,
+        "min_midi": 0,
+        "max_val": 99,
+        "min_val": 0,
         "default": "none",
         # LFO1 and LFO2 agree on the value of every destination they share,
         # so this is one global destination enumeration rather than a

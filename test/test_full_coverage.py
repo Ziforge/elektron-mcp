@@ -179,3 +179,30 @@ def test_lfo3_is_nrpn_only_with_the_numbers_from_the_manual():
         58, 59, 60, 61, 62, 70, 71, 72,
     ]
     assert {int(s["nrpn_lsb"]) for s in lfo3.values()} == {1}
+
+
+def test_declared_midi_range_covers_every_named_option():
+    """An option the declared range excludes cannot be selected.
+
+    The LFO destination parameters declared a 25 to 50 window while their
+    own option table ran 0 to 99, so most destinations -- the whole AMP and
+    FX half of Appendix D among them -- were unreachable, and a mid-range
+    value landed on no destination at all. A hardware sweep found it: every
+    LFO parameter except depth read as inaudible, because an LFO with no
+    destination cannot make its speed or waveform heard.
+    """
+    offenders = []
+    for section, params in SECTIONS.items():
+        for ident, spec in params.items():
+            options = spec.get("options")
+            if not isinstance(options, dict) or not options:
+                continue
+            lo = spec.get("min_midi", 0)
+            hi = spec.get("max_midi", 127)
+            values = [int(v) for v in options.values()]
+            if min(values) < lo or max(values) > hi:
+                offenders.append(
+                    f"{section}.{ident}: options {min(values)}-{max(values)} "
+                    f"outside declared {lo}-{hi}"
+                )
+    assert offenders == [], "\n".join(offenders)

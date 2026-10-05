@@ -93,9 +93,33 @@ BASELINE_VALUE = 64
 # A patch the probes start from. Everything else sits at mid. The amplitude
 # envelope is loud but short: loud so a change anywhere is audible, short so
 # the tail clears before the next probe rather than bleeding into it.
+# A parameter can only be heard if whatever it feeds is switched on. Most
+# of these exist because the first full sweep left 30 parameters
+# INCONCLUSIVE purely for want of that: a bipolar depth sitting at raw 64
+# is zero depth, and an LFO with no valid destination cannot make its own
+# speed or waveform audible.
 BASELINE_OVERRIDES = {
     "amp": {"atk": 0, "hold": 20, "dec": 60, "sus": 0, "rel": 20,
             "vol": 110, "pan": 64},
+    "filter_multi_mode": {
+        "freq": 70, "reso": 50, "type": 0,
+        # Bipolar -64..64, so raw 64 is no depth at all and the four
+        # envelope stages below it do nothing.
+        "env_depth": 127,
+        "atk": 10, "dec": 60, "sus": 40, "rel": 40,
+    },
+    "filter_base_width": {"base": 40, "wdth": 90, "env_delay": 0,
+                          "env_reset": 0, "key_tracking": 0},
+    # dest 67 is FILTER: Freq. Each LFO needs a real destination and some
+    # depth before its speed, waveform or phase can be heard. Trig mode
+    # with start phase 0 keeps it deterministic per note -- free-running
+    # would make every capture differ and swamp the noise floor.
+    "lfo1": {"dest": 67, "dep": 100, "spd": 90, "mult": 2, "wave": 1,
+             "mode": 1, "sph": 0, "fade": 64},
+    "lfo2": {"dest": 67, "dep": 100, "spd": 90, "mult": 2, "wave": 1,
+             "mode": 1, "sph": 0, "fade": 64},
+    "lfo3": {"dest": 67, "dep": 100, "spd": 90, "mult": 2, "wave": 1,
+             "mode": 1, "sph": 0, "fade": 64},
 }
 SILENCE_PEAK = 0.004
 SILENCE_TRIES = 14
