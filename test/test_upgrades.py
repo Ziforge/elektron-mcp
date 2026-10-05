@@ -369,3 +369,19 @@ def test_resample_handles_stereo_and_empty():
     stereo = np.zeros((1000, 2))
     assert analysis.resample(stereo, 44100, 48000).shape[1] == 2
     assert analysis.resample(np.zeros(0), 44100, 48000).size == 0
+
+
+def test_near_silent_capture_is_flagged_not_described_as_a_result():
+    """Noise floor measures as bright and noisy -- i.e. as good sleigh bells.
+
+    A scoring loop must never be able to mistake silence for success.
+    """
+    rng = np.random.default_rng(3)
+    floor = rng.normal(0, 1e-4, SR // 4)
+    d = analysis.describe(floor, SR)
+    assert d.get("low_level") is True
+    assert "noise floor" in d["note"]
+
+
+def test_normal_level_audio_is_not_flagged(ping):
+    assert "low_level" not in analysis.describe(ping, SR)

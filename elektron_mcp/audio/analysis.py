@@ -14,6 +14,14 @@ import numpy as np
 
 EPS = 1e-12
 
+# Below SILENT_PEAK there is nothing to describe at all. Between that and
+# LOW_LEVEL_PEAK there is only noise floor, and the descriptors computed from
+# it look like a bright, noisy percussion hit -- a near-silent capture
+# measures as near-perfect sleigh bells. Anything this quiet is flagged so a
+# scoring loop cannot mistake silence for success.
+SILENT_PEAK = 1e-5
+LOW_LEVEL_PEAK = 2e-3
+
 
 def _mono(audio: np.ndarray) -> np.ndarray:
     audio = np.asarray(audio, dtype=np.float64)
@@ -153,7 +161,7 @@ def describe(audio: np.ndarray, sr: int) -> dict:
         "crest_factor_db": round(20 * np.log10((peak + EPS) / (rms + EPS)), 2),
     }
 
-    if peak < 1e-5:
+    if peak < SILENT_PEAK:
         result["silent"] = True
         result["note"] = (
             "no signal captured; check the device is sounding and that USB "
@@ -195,6 +203,13 @@ def describe(audio: np.ndarray, sr: int) -> dict:
             "onsets": onset_count(x, sr),
         }
     )
+
+    if peak < LOW_LEVEL_PEAK:
+        result["low_level"] = True
+        result["note"] = (
+            f"peak is only {peak:.2e}; these descriptors are measuring noise "
+            "floor, not the sound, and must not be treated as a result"
+        )
     return result
 
 

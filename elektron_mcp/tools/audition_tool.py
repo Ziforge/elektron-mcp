@@ -291,6 +291,14 @@ def register_audition_tools(mcp, midi):
             ref = analysis.resample(ref, ref_sr, sr)
             resampled_from, ref_sr = ref_sr, sr
 
+        captured = analysis.describe(audio, sr)
+        if captured.get("silent") or captured.get("low_level"):
+            return {
+                "error": "captured almost nothing, so a score would be "
+                "meaningless -- noise floor scores as a bright noisy hit",
+                "captured": captured,
+            }
+
         result = {
             "score": analysis.mstft_distance(audio, ref, sr),
             "captured": analysis.describe(audio, sr),
