@@ -44,6 +44,37 @@ def _envelope(x: np.ndarray, sr: int, window_ms: float = 2.0) -> np.ndarray:
     return np.convolve(np.abs(x), np.ones(w) / w, mode="same")
 
 
+def resample(audio: np.ndarray, sr_from: int, sr_to: int) -> np.ndarray:
+    """Band-limited resample via the frequency domain.
+
+    Reference recordings are usually 44.1 kHz while the Digitone captures at
+    48 kHz, so scoring a patch against one needs a rate match. Done in the
+    frequency domain rather than by interpolation, because linear
+    interpolation adds its own high-frequency error and the comparison here
+    is spectral.
+    """
+    if sr_from == sr_to:
+        return np.asarray(audio, dtype=np.float64)
+
+    x = np.asarray(audio, dtype=np.float64)
+    n_in = x.shape[0]
+    if n_in == 0:
+        return x
+    n_out = int(round(n_in * sr_to / sr_from))
+
+    def one(col: np.ndarray) -> np.ndarray:
+        spec = np.fft.rfft(col)
+        out_bins = n_out // 2 + 1
+        resized = np.zeros(out_bins, dtype=complex)
+        keep = min(spec.size, out_bins)
+        resized[:keep] = spec[:keep]
+        return np.fft.irfft(resized, n=n_out) * (n_out / n_in)
+
+    if x.ndim == 1:
+        return one(x)
+    return np.stack([one(x[:, c]) for c in range(x.shape[1])], axis=1)
+
+
 def decay_time_ms(x: np.ndarray, sr: int, drop_db: float = 20.0) -> float | None:
     """Time from the envelope peak until it falls by drop_db.
 

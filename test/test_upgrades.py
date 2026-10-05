@@ -349,3 +349,23 @@ def test_subprocess_recorder_reports_a_bad_device():
 def test_subprocess_recorder_errors_if_never_started():
     with pytest.raises(capture.CaptureError):
         capture.SubprocessRecorder(0.1).finish()
+
+
+def test_resample_preserves_frequency_and_length():
+    """A reference at 44.1 kHz must be comparable with a 48 kHz capture."""
+    t = np.arange(44100) / 44100
+    tone = np.sin(2 * np.pi * 3000 * t)
+    out = analysis.resample(tone, 44100, 48000)
+    assert len(out) == 48000
+    assert abs(analysis.describe(out, 48000)["spectral_centroid_hz"] - 3000) < 20
+
+
+def test_resample_is_a_noop_at_matching_rates():
+    x = np.sin(np.linspace(0, 40, 1000))
+    assert np.allclose(analysis.resample(x, 48000, 48000), x)
+
+
+def test_resample_handles_stereo_and_empty():
+    stereo = np.zeros((1000, 2))
+    assert analysis.resample(stereo, 44100, 48000).shape[1] == 2
+    assert analysis.resample(np.zeros(0), 44100, 48000).size == 0

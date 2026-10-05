@@ -284,17 +284,20 @@ def register_audition_tools(mcp, midi):
         except capture.CaptureError as e:
             return {"error": str(e), "inputs": capture.list_input_devices()}
 
+        resampled_from = None
         if ref_sr != sr:
-            return {
-                "error": f"reference is {ref_sr} Hz but capture is {sr} Hz; "
-                "resample the reference first"
-            }
+            # Most reference recordings are 44.1 kHz; the Digitone captures at
+            # 48 kHz. Match them rather than refusing to compare.
+            ref = analysis.resample(ref, ref_sr, sr)
+            resampled_from, ref_sr = ref_sr, sr
 
         result = {
             "score": analysis.mstft_distance(audio, ref, sr),
             "captured": analysis.describe(audio, sr),
             "reference": analysis.describe(ref, ref_sr),
         }
+        if resampled_from:
+            result["reference_resampled_from_hz"] = resampled_from
         if save_as:
             result["saved_to"] = capture.save_wav(audio, sr, save_as)
         return result
