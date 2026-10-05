@@ -178,3 +178,72 @@ def test_an_fx_section_without_its_channel_is_refused():
     assert device.channel_for("amp") == 13
     with pytest.raises(ValueError, match="FX control channel"):
         device.channel_for("send_reverb")
+
+
+def test_the_spectral_distance_is_level_invariant():
+    """Worth pinning, because it is the reason the harness needs the
+    descriptors at all. mstft_distance RMS-normalises both signals before
+    comparing, so a parameter that only changes loudness -- a volume, a
+    send, the compressor's dry/wet -- is invisible to it."""
+    from rig_audio.analysis import mstft_distance
+
+    sr = 48000
+    rng = np.random.default_rng(0)
+    quiet = rng.standard_normal((sr, 2)) * 0.05
+    loud = quiet * 4.0
+    assert mstft_distance(quiet, loud, sr)["distance"] < 0.01
+
+    # The level descriptor is what notices it.
+    deltas = sweep.descriptor_deltas({"rms": 0.05}, {"rms": 0.20})
+    assert deltas["level"] > 0.5
+
+
+def test_the_lock_names_a_live_owner_and_ignores_a_stale_one(tmp_path,
+                                                             monkeypatch):
+    """Two sweeps at once interleave their patch writes to one instrument,
+    and every reading becomes noise -- a parameter proven to silence the
+    device read as no change at all under that. A stale lock from a killed
+    run must not block the next one either."""
+    lock = tmp_path / "sweep.lock"
+    monkeypatch.setattr(sweep, "LOCK_PATH", str(lock))
+
+    assert sweep.acquire_lock() is None
+    assert lock.read_text().strip() == str(os.getpid())
+
+    # A second attempt from this same process sees a live owner.
+    assert sweep.acquire_lock() == os.getpid()
+
+    # A lock naming a process that no longer exists is taken over.
+    lock.write_text("999999")
+    assert sweep.acquire_lock() is None
+
+    # Garbage is treated as stale rather than crashing.
+    lock.write_text("not-a-pid")
+    assert sweep.acquire_lock() is None
+
+    sweep.release_lock()
+    assert not lock.exists()
+
+
+def test_set_in_resolves_the_channel_from_the_section():
+    """The probe path once called send_param without a channel, so every
+    FX parameter was sent to the track's channel, where its CC number
+    means something else. That inverted two verdicts: the pattern volume
+    read as doing nothing, and an external input with nothing plugged into
+    it read as responding. set_in works the channel out itself so a caller
+    cannot leave it off."""
+    sent = []
+
+    class FakePort:
+        def send(self, message):
+            sent.append((message.channel, message.control, message.value))
+
+    device = sweep.Device.__new__(sweep.Device)
+    device.channel = 13
+    device.fx_channel = 8
+    device.port = FakePort()
+
+    device.set_in("amp", {"cc_msb": 90}, 100)
+    device.set_in("compressor", {"cc_msb": 119}, 0)
+
+    assert sent == [(13, 90, 100), (8, 119, 0)]

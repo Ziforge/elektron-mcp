@@ -27,11 +27,16 @@ wrong answer earlier in this project:
   the delay off, a filter envelope depth with a flat envelope -- and that
   says nothing about whether its CC is right.
 
-Two measures are taken, because one is blind to the other's parameters. A
-multi-resolution log-STFT distance catches anything that changes the
-spectrum, but it sums to mono first, so a pan control moves nothing it can
-see; a stereo balance reading catches those. Each is compared against its
-own measured floor.
+Three measures are taken, because each is blind to what the others see.
+The multi-resolution log-STFT distance catches a change of spectral shape,
+but it sums to mono and it RMS-normalises both signals first -- it is
+deliberately level-invariant, being built to score a patch against a
+reference recorded at some other level. So it cannot see a pan control, and
+it cannot see a pure loudness change either: the compressor's dry/wet mix
+halved the output level and moved that distance by 0.04. A stereo balance
+reading catches the first and the descriptors catch the second. Each is
+compared against its own floor, measured on the same material in the same
+run.
 
 Only one SYN machine and one filter machine can be swept at a time, and
 the set is refused if any CC is claimed twice. This is not a convenience:
@@ -54,6 +59,7 @@ reaches something that changes the sound in a particular way.
 import argparse
 import json
 import os
+import signal
 import statistics
 import sys
 import time
@@ -146,6 +152,13 @@ BASELINE_OVERRIDES = {
     "lfo3": {"dest": 67, "dep": 100, "spd": 90, "mult": 2, "wave": 1,
              "mode": 1, "sph": 0, "fade": 64},
 }
+# Only one sweep may run at a time. Two of them resending their own full
+# patch to the same instrument interleave conflicting CC writes, and every
+# reading becomes meaningless -- including, in one case, a parameter proven
+# minutes earlier to silence the device reading as no change at all. The
+# lock is a file holding the owning process id.
+LOCK_PATH = os.path.join(os.path.expanduser("~"), ".elektron-mcp",
+                         "sweep.lock")
 SILENCE_PEAK = 0.004
 SILENCE_TRIES = 14
 # An unchanged patch should measure close to itself. Much above this and
@@ -293,6 +306,18 @@ class Device:
         # size before the next note reflects all of it.
         time.sleep(0.12)
 
+    def set_in(self, section, spec, value):
+        """Set one parameter, on the channel its section belongs to.
+
+        Prefer this to send_param: it works the channel out from the
+        section, so a caller cannot leave it off and silently address the
+        track instead. A caller did, and it inverted two verdicts -- the
+        pattern volume read as inert while an unconnected external input
+        read as responding, because both probes went to the track channel
+        where those CC numbers mean something else entirely.
+        """
+        return self.send_param(spec, value, self.channel_for(section))
+
     def send_param(self, spec, value, channel=None):
         """Set one parameter, by CC or by NRPN as the map declares."""
         if channel is None:
@@ -363,6 +388,42 @@ class Device:
         if sections and patch:
             self.send_patch(sections, patch)
         self.port.close()
+
+
+def acquire_lock():
+    """Refuse to start while another sweep holds the instrument."""
+    os.makedirs(os.path.dirname(LOCK_PATH), exist_ok=True)
+    if os.path.exists(LOCK_PATH):
+        try:
+            with open(LOCK_PATH) as handle:
+                owner = int(handle.read().strip())
+        except (ValueError, OSError):
+            owner = None
+        if owner is not None:
+            try:
+                os.kill(owner, 0)
+            except ProcessLookupError:
+                pass  # Stale: the owner is gone.
+            except PermissionError:
+                return owner  # Alive and not ours.
+            else:
+                return owner
+    with open(LOCK_PATH, "w") as handle:
+        handle.write(str(os.getpid()))
+    return None
+
+
+def release_lock():
+    try:
+        with open(LOCK_PATH) as handle:
+            if int(handle.read().strip()) != os.getpid():
+                return
+    except (ValueError, OSError):
+        return
+    try:
+        os.remove(LOCK_PATH)
+    except OSError:
+        pass
 
 
 def wait_for_silence(audio_device, device=None):
@@ -578,6 +639,14 @@ def main():
                if not only or f"{name}.{ident}" in only]
     total = len(probing)
 
+    held_by = acquire_lock()
+    if held_by is not None:
+        print(f"another sweep is running (pid {held_by}) and holds the "
+              f"instrument. Two at once interleave their patch writes and "
+              f"every reading becomes noise. Wait for it, or stop it with "
+              f"kill {held_by}.")
+        return 2
+
     window = None
     if args.window_ms:
         try:
@@ -604,6 +673,17 @@ def main():
           f"{args.filter_machine}, {args.profile} "
           f"(gate {args.gate_ms} ms){extra}")
     print(f"{len(sections)} sections, {total} parameters")
+    # Being killed must not leave the device on whatever the last probe
+    # set. One of the probes here takes the pattern volume to zero, which
+    # mutes the instrument entirely, and a SIGTERM skips the restore in the
+    # finally block below -- so handle it and exit through the same path.
+
+    def _restore_and_exit(signum, _frame):
+        raise KeyboardInterrupt(f"signal {signum}")
+
+    for sig in (signal.SIGTERM, signal.SIGHUP, signal.SIGINT):
+        signal.signal(sig, _restore_and_exit)
+
     try:
         print("measuring the noise floor...")
         ref, sr, floor, bal_floor, wander = measure_noise_floor(
@@ -672,10 +752,15 @@ def main():
             best_moved = {}
             for value in probe_values(spec):
                 device.send_patch(sections, patch, skip=(name, ident))
-                device.send_param(spec, value)
+                # The channel matters: an FX-section parameter sent to
+                # the track's channel lands on whatever that track has on
+                # the same CC. That was happening, and it inverted two
+                # verdicts -- the pattern volume read as doing nothing
+                # while an inert external input read as responding.
+                device.set_in(name, spec, value)
                 time.sleep(0.05)
                 probe, _ = capture(device, args.audio_device,
-                                   args.seconds)
+                                   args.seconds, window)
                 d = mstft_distance(ref, probe, sr)["distance"]
                 shift = abs(balance(probe) - ref_balance)
                 moved = changed_descriptors(ref_desc,
@@ -702,8 +787,14 @@ def main():
             print(f"  [{done:3d}/{total}] {name}.{ident:<18} "
                   f"{how_sent:<4} {str(address):>5}  d={best:7.4f}  "
                   f"{verdict:<12} {moved_text}")
+    except KeyboardInterrupt as stop:
+        print(f"\ninterrupted ({stop}); restoring the patch")
+        raise
     finally:
+        # Put the baseline back whichever way this ended, so the
+        # instrument is left audible rather than on a probe value.
         device.close(sections, patch)
+        release_lock()
 
     kinds = {}
     for r in results:
