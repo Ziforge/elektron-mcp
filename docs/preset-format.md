@@ -160,11 +160,44 @@ the calibrated 271 bytes, and `save_current_as_preset` reads back what the
 device actually stored and reports whether the parameters survived, rather
 than trusting an accepted upload.
 
-## What would finish it
+## Why writing parameters is harder than it looked
 
-Calibrate more than one preset. Two calibration presets of different payload
-lengths would show whether the block moves with a landmark (the `be ef ba ce`
-marker at offset 40-41, or the footer) or whether the encoding itself is
-variable. That is a handful of saves on the device, not a research project --
-and the write-then-verify loop means each hypothesis can be tested for real
-rather than argued about.
+The device does not store an uploaded payload verbatim. It parses and
+re-encodes it. Comparing a 271-byte upload with known values against the
+266 bytes the device returned for the same slot:
+
+| | |
+|---|---|
+| common prefix | 83 bytes |
+| common suffix | 4 bytes (the footer marker alone) |
+| parameter block | offsets 85-143, entirely inside the diverging region |
+
+The two bodies share recognisable runs, shifted and restructured, so this is
+a re-encoding rather than a localised edit. Both length fields and the hash
+were recomputed correctly by the device, and byte 24 behaves like a counter
+(incremented on save).
+
+The consequence: the 30 offsets decode the calibration preset because the
+*device produced it*. They do not describe the format, and they do not
+survive a round trip through the device. Two more calibration presets would
+not settle this -- the body appears to use a variable-length scheme, so
+pinning it means working out the encoding, not finding a landmark.
+
+That is a genuine reverse-engineering project. It is feasible -- presets are
+small, the hash is solved so uploads are accepted, and the write-then-verify
+loop can test any hypothesis against the hardware -- but it is not a
+quick job, and nothing in this repo should pretend otherwise.
+
+## What works today
+
+- Download, back up, copy and clear presets and projects on the device.
+- Read a device-produced preset's parameters, for the calibrated payload
+  length.
+- Compute and reseal the content hash, so an edited preset is accepted.
+- `apply_parameters` refuses a payload of uncalibrated length, and
+  `save_current_as_preset` reads back what the device stored and reports
+  whether the parameters survived rather than trusting the upload.
+
+For keeping a sound, the patch store is the reliable route: it replays the
+parameter values over CC in about a second. Saving to a device slot still
+needs the five button presses on the Digitone.
