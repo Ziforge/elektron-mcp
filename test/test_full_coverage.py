@@ -28,7 +28,7 @@ def test_every_parameter_is_reachable_by_a_tool():
     for section, params in SECTIONS.items():
         tool = tools.get(f"set_{section}")
         assert tool is not None, f"no tool registered for section {section}"
-        properties = set(tool.inputSchema["properties"])
+        properties = set(tool.input_schema["properties"])
         gaps += [(section, p) for p in params if p not in properties]
     assert gaps == [], f"parameters unreachable by any tool: {gaps}"
 

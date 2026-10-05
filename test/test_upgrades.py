@@ -248,7 +248,7 @@ def test_section_tools_expose_units_and_nrpn():
 
     tools = {t.name: t for t in asyncio.run(mcp.list_tools())}
     for section in SECTIONS:
-        props = tools[f"set_{section}"].inputSchema["properties"]
+        props = tools[f"set_{section}"].input_schema["properties"]
         assert "units" in props and "use_nrpn" in props
 
 

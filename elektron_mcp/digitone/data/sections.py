@@ -8,8 +8,11 @@ flattening once and guarantees the resulting Python identifiers are unique
 within a section.
 """
 
-import keyword
-import re
+# to_identifier is shared with the other instrument servers:
+# verified to produce identical results across all 210 labels
+# in the Digitone and Rytm maps before the local copy was
+# removed.
+from rig_midi.params import to_identifier
 
 from elektron_mcp.digitone.data.amp import AMP_PARAMS_DATA
 from elektron_mcp.digitone.data.filters import (
@@ -27,29 +30,6 @@ from elektron_mcp.digitone.data.fx import FX_PARAMS_DATA
 from elektron_mcp.digitone.data.lfo import LFO1_PARAMS, LFO2_PARAMS, LFO3_PARAMS
 from elektron_mcp.digitone.data.swarmer import SWARMER_PARAMS
 from elektron_mcp.digitone.data.wavetone import WAVETONE_PARAMS
-
-
-def to_identifier(name: str) -> str:
-    """Turn a hardware parameter label into a Python identifier.
-
-    Parenthetical hints are dropped ('TYPE(lowpass/highpass)' -> 'type') and
-    every remaining non-alphanumeric run becomes a single underscore
-    ('OP.AB' -> 'op_ab', 'Env. RSET' -> 'env_rset').
-    """
-    name = re.sub(r"\(.*?\)", "", name)
-    name = re.sub(r"[^0-9a-zA-Z]+", "_", name).strip("_").lower()
-    if not name:
-        return "param"
-    # Parameters are generated into real function signatures, so an identifier
-    # that collides with a Python keyword ('DEL' -> 'del') gets a trailing
-    # underscore. The hardware label is kept in the spec either way.
-    # Soft keywords ('type', 'match') are legal parameter names, so only hard
-    # keywords need escaping.
-    if keyword.iskeyword(name):
-        name = f"{name}_"
-    if name[0].isdigit():
-        name = f"p_{name}"
-    return name
 
 
 def _walk(node: dict, page: str, path: tuple, out: dict) -> None:

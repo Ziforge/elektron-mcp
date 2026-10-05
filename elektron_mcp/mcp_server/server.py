@@ -2,7 +2,7 @@
 MCP server configuration and initialization.
 """
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from elektron_mcp.midi.digitone_midi import DigitoneMIDI
 from elektron_mcp.tools.lfo_tool import register_lfo_tools
@@ -10,7 +10,10 @@ from elektron_mcp.tools.wavetone_tool import register_wavetone_tools
 from elektron_mcp.tools.filter_tool import register_filter_tools
 from elektron_mcp.tools.amp_tool import register_amp_tools
 from elektron_mcp.tools.fx_tool import register_fx_tools
-from elektron_mcp.tools.section_tool import register_section_tools
+from elektron_mcp.tools.section_tool import (
+    register_enum_tool,
+    register_section_tools,
+)
 from elektron_mcp.tools.play_tool import register_play_tools
 from elektron_mcp.tools.reference_tool import register_reference_tools
 from elektron_mcp.tools.audition_tool import register_audition_tools
@@ -22,7 +25,11 @@ from elektron_mcp.tools.preset_tool import register_preset_tools
 
 
 # Initialize MCP and MIDI
-mcp = FastMCP("Digitone 2")
+mcp = MCPServer(
+    "Digitone 2",
+    instructions="Control an Elektron Digitone II and Analog Rytm MKII over MIDI,\n"
+    "with audio measurement and preset transfer.",
+)
 midi = DigitoneMIDI()
 
 # Register all tools
@@ -49,6 +56,8 @@ register_learn_tools(mcp, midi)
 # Analog Rytm MKII: same batch-tool machinery over its own parameter map.
 # Tracks are MIDI channels 1-12, FX is channel 13, performance macros are 14.
 register_section_tools(mcp, midi, RYTM_SECTIONS, RYTM_NOTES)
+# Registered once, after every device's sections are known.
+register_enum_tool(mcp, midi)
 
 # Hand the MIDI port over to Elektroid/Transfer without stopping the server.
 register_port_tools(mcp, midi)

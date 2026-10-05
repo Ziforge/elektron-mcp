@@ -215,7 +215,7 @@ def apply_sections(
 def _make_tool(midi, section: str, params: dict):
     """Generate a real function with one optional argument per parameter.
 
-    FastMCP derives the tool schema from the signature, so the arguments are
+    The MCP server derives the tool schema from the signature, so the arguments are
     compiled rather than hidden behind **kwargs -- that is what makes them
     visible and individually documented to the model.
     """
@@ -252,6 +252,15 @@ def register_section_tools(mcp, midi, sections: dict | None = None,
     ALL_SECTIONS.update(registry)
     for section, params in registry.items():
         mcp.tool()(_make_tool(midi, section, params))
+
+
+def register_enum_tool(mcp, midi):
+    """Register the named-option tool.
+
+    Separate from register_section_tools because that is called once per
+    device, and registering this inside it produced a duplicate tool name --
+    silently tolerated by MCP SDK 1.x and warned about by 2.x.
+    """
 
     @mcp.tool()
     def set_enum_parameter(section: str, track: int, parameter: str,

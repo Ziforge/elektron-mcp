@@ -41,7 +41,7 @@ def test_every_rytm_parameter_is_reachable():
     for section, params in RYTM_SECTIONS.items():
         tool = tools.get(f"set_{section}")
         assert tool is not None, f"no tool registered for {section}"
-        props = set(tool.inputSchema["properties"])
+        props = set(tool.input_schema["properties"])
         gaps += [(section, p) for p in params if p not in props]
     assert gaps == [], f"unreachable Rytm parameters: {gaps}"
 
