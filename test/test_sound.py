@@ -128,7 +128,47 @@ def test_renaming_touches_only_the_name_field_inside_the_header(tmp_path):
     after = sound.read(out["file"])["payload"]
     diff = [i for i, (a, b) in enumerate(zip(before, after)) if a != b]
     assert diff, "rename changed nothing"
-    assert all(51 <= i < 57 for i in diff), f"changed beyond the name: {diff}"
+    # The CRC field is expected to change: editing the payload invalidates
+    # the stored content hash, so build_from_template reseals it.
+    crc_field = range(len(before) - sound.CRC_FIELD_FROM_END,
+                      len(before) - sound.CRC_FIELD_FROM_END + 4)
+    unexpected = [i for i in diff if not (51 <= i < 57 or i in crc_field)]
+    assert not unexpected, f"changed beyond name and CRC: {unexpected}"
+
+
+def test_write_refuses_an_uncalibrated_payload_length():
+    """The offsets came from one preset and are not known to generalise, so
+    writing to a payload of a different length must fail rather than produce
+    a preset that uploads cleanly and sounds like nothing intended."""
+    short = bytes(sound.CALIBRATED_PAYLOAD_LEN - 20)
+    with pytest.raises(sound.PresetError, match="calibrated"):
+        sound.apply_parameters(short, {"gran": 10})
+    assert sound.layout_is_trusted(bytes(sound.CALIBRATED_PAYLOAD_LEN))
+    assert not sound.layout_is_trusted(short)
+
+
+def test_crc_matches_the_device_on_every_real_preset():
+    """CRC-32 seeded 0xffffffff over [32:-12], verified against presets taken
+    off the device. Getting this wrong is what the device rejects with
+    "Content hash mismatch"."""
+    import glob
+    files = [f for f in glob.glob(str(Path.home() /
+             ".elektron-mcp/calibration/download/*.dn2pst"))
+             if not f.endswith("/.dn2pst")]
+    if not files:
+        pytest.skip("no downloaded presets available")
+    for f in files:
+        payload = sound.read(f)["payload"]
+        assert sound.verify(payload), f"{f} failed its own CRC"
+
+
+def test_reseal_makes_an_edited_payload_valid_again():
+    payload = bytearray(sound.CALIBRATED_PAYLOAD_LEN)
+    payload[sound.offsets()["gran"]] = 99
+    sealed = sound.reseal(bytes(payload))
+    assert sound.verify(sealed)
+    assert not sound.verify(bytes(payload)) or sound.content_crc(
+        bytes(payload)) == sound.stored_crc(bytes(payload))
 
 
 @pytest.mark.skipif(not REAL.is_file() or not TRUTH.is_file(),

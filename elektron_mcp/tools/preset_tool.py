@@ -290,12 +290,45 @@ def register_preset_tools(mcp, midi):
                                        f"/{slot.lstrip('/')}")
         except elektroid.ElektroidError as e:
             return {"error": str(e), "built": built}
-        return {
-            "saved": name, "slot": slot, "built": built,
-            "output": out.strip() or None,
-            "note": "verify on the device: the preset header is templated "
-                    "and has not been decoded.",
-        }
+
+        # Verify by reading back what the device actually stored. The device
+        # re-serialises a preset on save, so an accepted upload does not mean
+        # the parameters landed where intended -- the first attempt uploaded
+        # cleanly and produced nonsense.
+        check = {"verified": None}
+        try:
+            with _port_handover(midi):
+                index = elektroid.find_device("Digitone")
+                readback = Path(built["file"]).parent / "readback"
+                elektroid.download(index, PRESET_FS, f"/{slot.lstrip('/')}",
+                                   str(readback))
+            intended = built["parameters_written"]
+            for f in sorted(readback.glob("*.dn2pst")):
+                got = sound.read(f)
+                mismatches = {
+                    k: {"intended": v, "stored": got["parameters"].get(k)}
+                    for k, v in intended.items()
+                    if got["parameters"].get(k) != v
+                }
+                check = {
+                    "verified": not mismatches,
+                    "stored_payload_bytes": len(got["payload"]),
+                    "mismatches": mismatches or None,
+                }
+                break
+        except (elektroid.ElektroidError, sound.PresetError) as e:
+            check = {"verified": None, "verify_error": str(e)}
+
+        result = {"saved": name, "slot": slot, "built": built,
+                  "output": out.strip() or None, "check": check}
+        if check.get("verified") is False:
+            result["warning"] = (
+                f"the device accepted the upload but slot {slot} does not "
+                "hold the intended parameters. The payload layout does not "
+                "apply to what the device stored. Clear the slot rather than "
+                "trusting this preset."
+            )
+        return result
 
     @mcp.tool()
     def backup_device_project(slot: str = "002",

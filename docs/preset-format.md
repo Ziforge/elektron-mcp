@@ -34,7 +34,7 @@ Plain, legible JSON — fully authorable:
 `ProductType` 43 is the Digitone II, matching Elektroid's device table.
 `FileType` is `Sound` for a preset. Tags are the ones shown on the device.
 
-## Parameter payload (FM Drum: decoded)
+## Parameter payload (FM Drum: decoded for ONE preset only)
 
 Payload length varies by machine: 334 bytes for a WAVETONE/FM TONE preset,
 271 bytes for an FM DRUM one. Structure:
@@ -55,8 +55,9 @@ the 7-bit MIDI value in the **odd (second) byte** of each word:
 offset 85 + (n * 2)  ->  parameter n
 ```
 
-For FM DRUM the order matches the device's own page layout exactly, and all
-30 parameters were located with no ambiguity:
+For the calibration preset these 30 offsets decode exactly, with no
+ambiguity, and the order matches the device's own page layout. **They do not
+generalise** -- see "What does not work" below.
 
 | offset | parameter | | offset | parameter |
 |---|---|---|---|---|
@@ -107,3 +108,63 @@ Writing a preset file into a slot needs no interaction with the device
 can be generated, saving a sound is fully automatable. Committing live
 parameter state has no MIDI equivalent -- slot-to-RAM exists, RAM-to-slot does
 not -- but authoring a file sidesteps that entirely.
+
+## Content hash (solved)
+
+The device validates payload integrity and refuses an upload it does not
+like with `Content hash mismatch`. The hash is:
+
+```
+CRC-32, seeded 0xffffffff, over payload[32 : len-12]
+stored big-endian at payload[len-12 : len-8]
+```
+
+Verified against six presets taken off the device: every stored value matches
+the computed one. Elektroid's own `elektron_crc()` uses the same seed, which
+is what suggested it after plain CRC-32 failed.
+
+The footer is the last 16 bytes:
+
+| bytes | meaning |
+|---|---|
+| `[-16:-12]` | zero padding |
+| `[-12:-8]` | content hash (above) |
+| `[-8:-4]` | `payload_length - 43` |
+| `[-4:]` | constant marker `aa a1 da aa` |
+
+There is also a length field at payload offset 34 holding
+`payload_length - 51`.
+
+Resealing after an edit makes the device **accept** the upload. That part
+works.
+
+## What does not work
+
+Writing parameters by absolute offset. Evidence:
+
+- An upload of a 271-byte payload came back from the device as **266 bytes**.
+  The device parses and re-serialises a preset on save rather than storing
+  the bytes verbatim.
+- Payload length varies widely between presets: 247, 266, 271, 285, 296,
+  302, 334 bytes observed.
+- A structural search for the block -- 16-bit words with a zero high byte --
+  finds it in no preset except the calibration one, and even there lands two
+  bytes off. The high byte is not reliably zero: at offset 84 it is 0x2E.
+
+Taken together the payload is probably tagged or variable-length, not a flat
+array. The 30 offsets are an accurate description of one file, not of the
+format.
+
+`apply_parameters` therefore refuses any payload whose length differs from
+the calibrated 271 bytes, and `save_current_as_preset` reads back what the
+device actually stored and reports whether the parameters survived, rather
+than trusting an accepted upload.
+
+## What would finish it
+
+Calibrate more than one preset. Two calibration presets of different payload
+lengths would show whether the block moves with a landmark (the `be ef ba ce`
+marker at offset 40-41, or the footer) or whether the encoding itself is
+variable. That is a handful of saves on the device, not a research project --
+and the write-then-verify loop means each hypothesis can be tested for real
+rather than argued about.

@@ -14,7 +14,9 @@ length field, templating keeps it valid where constructing one would not.
 
 import io
 import json
+import struct
 import zipfile
+import zlib
 from pathlib import Path
 
 # FM DRUM parameter order as stored in the payload. This follows the device's
@@ -29,7 +31,23 @@ FM_DRUM_ORDER = (
 BLOCK_START = 85
 STRIDE = 2
 
+# The device validates payload integrity and rejects a mismatch with
+# "Content hash mismatch". The hash is CRC-32 seeded 0xffffffff over the
+# payload from CRC_START up to the footer, stored big-endian 12 bytes from
+# the end. Verified against six presets taken off the device.
+CRC_START = 32
+CRC_FIELD_FROM_END = 12
+FOOTER_MAGIC = bytes.fromhex("aaa1daaa")
+
 MACHINE_LAYOUTS = {"fm_drum": (BLOCK_START, STRIDE, FM_DRUM_ORDER)}
+
+# The offsets above were derived from one calibration preset and decode it
+# exactly. They are NOT known to generalise: payload length varies between
+# presets (247 to 334 bytes observed) and the device re-serialises a preset
+# on save, returning 266 bytes for a 271-byte upload. That means the payload
+# is probably tagged or variable-length rather than a flat array, so an
+# absolute offset is only trustworthy for a payload of the calibrated length.
+CALIBRATED_PAYLOAD_LEN = 271
 
 
 class PresetError(RuntimeError):
@@ -81,9 +99,26 @@ def read(path: str | Path, machine: str = "fm_drum") -> dict:
     }
 
 
+def layout_is_trusted(payload: bytes) -> bool:
+    """Whether the known offsets can be trusted for this payload."""
+    return len(payload) == CALIBRATED_PAYLOAD_LEN
+
+
 def apply_parameters(payload: bytes, values: dict[str, int],
-                     machine: str = "fm_drum") -> tuple[bytes, list[str]]:
-    """Overwrite parameter values in a payload. Returns (payload, unknown)."""
+                     machine: str = "fm_drum",
+                     require_trusted: bool = True) -> tuple[bytes, list[str]]:
+    """Overwrite parameter values in a payload. Returns (payload, unknown).
+
+    Refuses a payload whose length differs from the calibrated one, since the
+    offsets are not known to generalise and writing to the wrong ones
+    produces a preset that uploads cleanly and sounds like nothing intended.
+    """
+    if require_trusted and not layout_is_trusted(payload):
+        raise PresetError(
+            f"payload is {len(payload)} bytes but the parameter offsets were "
+            f"calibrated on {CALIBRATED_PAYLOAD_LEN}; refusing to write to "
+            "offsets that may not apply. Recalibrate for this payload length."
+        )
     buf = bytearray(payload)
     known = offsets(machine)
     unknown = []
@@ -97,6 +132,35 @@ def apply_parameters(payload: bytes, values: dict[str, int],
             continue
         buf[off] = max(0, min(127, int(value)))
     return bytes(buf), unknown
+
+
+def content_crc(payload: bytes) -> int:
+    """The payload's content hash, as the device computes it."""
+    body = payload[CRC_START:len(payload) - CRC_FIELD_FROM_END]
+    return zlib.crc32(body, 0xFFFFFFFF) & 0xFFFFFFFF
+
+
+def stored_crc(payload: bytes) -> int:
+    """The hash currently recorded in the payload's footer."""
+    return struct.unpack_from(">I", payload,
+                              len(payload) - CRC_FIELD_FROM_END)[0]
+
+
+def reseal(payload: bytes) -> bytes:
+    """Recompute the content hash after editing a payload.
+
+    Without this the device refuses the upload: editing parameter bytes
+    invalidates the stored hash, and it reports "Content hash mismatch".
+    """
+    buf = bytearray(payload)
+    struct.pack_into(">I", buf, len(buf) - CRC_FIELD_FROM_END,
+                     content_crc(bytes(buf)))
+    return bytes(buf)
+
+
+def verify(payload: bytes) -> bool:
+    """Whether the stored hash matches the content."""
+    return stored_crc(payload) == content_crc(payload)
 
 
 def write(path: str | Path, payload: bytes, name: str,
@@ -154,6 +218,7 @@ def build_from_template(template: str | Path, values: dict[str, int],
     source = read(template, machine)
     payload, unknown = apply_parameters(source["payload"], values, machine)
     payload = rename_in_payload(payload, source["name"], name)
+    payload = reseal(payload)
     written = write(dest, payload, name, tags or source["tags"],
                     source["firmware"] or "1.11")
     return {
