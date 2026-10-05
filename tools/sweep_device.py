@@ -98,9 +98,21 @@ BASELINE_VALUE = 64
 # INCONCLUSIVE purely for want of that: a bipolar depth sitting at raw 64
 # is zero depth, and an LFO with no valid destination cannot make its own
 # speed or waveform audible.
+# Two amplitude profiles. A short percussive note keeps the tail clear
+# between probes, but it ends before any later envelope stage or LFO cycle
+# can be heard -- which is why the filter's decay, sustain and release, and
+# every LFO parameter but depth, first read as inaudible. The sustained
+# profile holds the note open so time-varying parameters have something to
+# vary.
+AMP_PROFILES = {
+    "percussive": {"atk": 0, "hold": 20, "dec": 60, "sus": 0, "rel": 20,
+                   "vol": 110, "pan": 64},
+    "sustained": {"atk": 0, "hold": 80, "dec": 110, "sus": 110, "rel": 50,
+                  "vol": 110, "pan": 64},
+}
+
 BASELINE_OVERRIDES = {
-    "amp": {"atk": 0, "hold": 20, "dec": 60, "sus": 0, "rel": 20,
-            "vol": 110, "pan": 64},
+    "amp": dict(AMP_PROFILES["percussive"]),
     "filter_multi_mode": {
         "freq": 70, "reso": 50, "type": 0,
         # Bipolar -64..64, so raw 64 is no depth at all and the four
@@ -123,6 +135,12 @@ BASELINE_OVERRIDES = {
 }
 SILENCE_PEAK = 0.004
 SILENCE_TRIES = 14
+# An unchanged patch should measure close to itself. Much above this and
+# the baseline is not stable enough to measure anything against -- a
+# near-closed filter or a near-silent envelope gives an unstable log-STFT,
+# and every verdict taken against it is noise. Seen in practice at 2.31.
+FLOOR_UNUSABLE = 0.5
+QUIET_RMS = 0.002
 
 
 def cc_of(spec):
@@ -329,6 +347,24 @@ def main():
                     help="the filter machine assigned to the track")
     ap.add_argument("--sections", default="",
                     help="restrict to these, from the compatible set")
+    ap.add_argument("--set", action="append", default=[],
+                    metavar="SECTION.PARAM=VALUE",
+                    help="override one baseline value. A parameter is only "
+                         "audible if what it feeds is switched on, so this "
+                         "is how a straggler gets the conditions it needs")
+    ap.add_argument("--quiet-lfos", action="store_true",
+                    help="zero the LFO depths in the baseline. Three LFOs "
+                         "modulating a long note make each capture less "
+                         "repeatable, which raises the noise floor and "
+                         "hides small changes elsewhere")
+    ap.add_argument("--params", default="",
+                    help="comma-separated section.param to probe; the rest "
+                         "of the patch is still sent, just not probed")
+    ap.add_argument("--profile", default="percussive",
+                    choices=sorted(AMP_PROFILES),
+                    help="percussive keeps probes quick; sustained holds "
+                         "the note open so envelope stages and LFO cycles "
+                         "are audible")
     ap.add_argument("--note", type=int, default=60)
     ap.add_argument("--velocity", type=int, default=100)
     ap.add_argument("--gate-ms", type=int, default=400)
@@ -352,13 +388,47 @@ def main():
         print(f"available: {sorted(compatible)}")
         return 2
     sections = {s: compatible[s] for s in wanted}
+
+    # A targeted re-probe still sends the whole patch -- the point of the
+    # full resend is that the parameter under test is the only thing that
+    # differs -- but only probes what was asked for.
+    only = {p for p in args.params.split(",") if p}
+    unknown = [p for p in only
+               if p.split(".", 1)[0] not in sections
+               or p.split(".", 1)[-1] not in sections[p.split(".", 1)[0]]]
+    if unknown:
+        print(f"unknown parameters: {unknown}")
+        return 2
+
+    BASELINE_OVERRIDES["amp"] = dict(AMP_PROFILES[args.profile])
+    if args.quiet_lfos:
+        for name in ("lfo1", "lfo2", "lfo3"):
+            BASELINE_OVERRIDES[name] = {**BASELINE_OVERRIDES[name],
+                                        "dep": 0, "dest": 0}
+    if args.profile == "sustained" and args.gate_ms < 700:
+        # No point holding the envelope open and then releasing the key
+        # before it gets there.
+        args.gate_ms = 700
+        args.seconds = max(args.seconds, 1.6)
     patch = baseline_for(sections)
-    total = sum(len(p) for p in sections.values())
+    for assignment in args.set:
+        target, _, raw = assignment.partition("=")
+        name, _, ident = target.partition(".")
+        if name not in patch or ident not in patch[name]:
+            print(f"--set names an unknown parameter: {target}")
+            return 2
+        patch[name][ident] = int(raw)
+        print(f"  baseline override: {target} = {int(raw)}")
+    probing = [(name, ident) for name, params in sections.items()
+               for ident in params
+               if not only or f"{name}.{ident}" in only]
+    total = len(probing)
 
     device = Device(args.port, args.track, args.note, args.velocity,
                     args.gate_ms)
     print(f"track {args.track}, machine {args.machine}, filter "
-          f"{args.filter_machine}")
+          f"{args.filter_machine}, {args.profile} "
+          f"(gate {args.gate_ms} ms)")
     print(f"{len(sections)} sections, {total} parameters")
     try:
         print("measuring the noise floor...")
@@ -381,57 +451,68 @@ def main():
               f"  -> a shift must exceed {bal_threshold:.4f}")
         ref_balance = balance(ref)
         ref_desc = describe(ref, sr)
+        if mean > FLOOR_UNUSABLE:
+            print(f"  the baseline is not stable enough to measure: an "
+                  f"unchanged patch differs by {mean:.3f}. Pick settings "
+                  f"where the note is clearly audible -- a nearly closed "
+                  f"filter or a near-silent envelope does this.")
+            return 1
+        if float(ref_desc.get("rms") or 0) < QUIET_RMS:
+            print(f"  the baseline is too quiet to measure: rms "
+                  f"{ref_desc.get('rms')}. Raise the level or lengthen "
+                  f"the envelope.")
+            return 1
         print(f"  baseline: rms {ref_desc.get('rms')}, centroid "
               f"{ref_desc.get('spectral_centroid_hz')} Hz, decay "
               f"{ref_desc.get('decay_t20_ms')} ms, flatness "
               f"{ref_desc.get('spectral_flatness')}")
 
         results, done = [], 0
-        for name, params in sections.items():
-            for ident, spec in params.items():
-                done += 1
-                cc = cc_of(spec)
-                pair = nrpn_of(spec)
-                if cc is None and pair is None:
-                    results.append({"section": name, "param": ident,
-                                    "verdict": "UNADDRESSABLE"})
-                    continue
-                how_sent = "CC" if cc is not None else "NRPN"
-                address = cc if cc is not None else f"{pair[0]}:{pair[1]}"
-                best, best_value, best_bal = 0.0, None, 0.0
-                best_moved = {}
-                for value in probe_values(spec):
-                    device.send_patch(sections, patch, skip=(name, ident))
-                    device.send_param(spec, value)
-                    time.sleep(0.05)
-                    probe, _ = capture(device, args.audio_device,
-                                       args.seconds)
-                    d = mstft_distance(ref, probe, sr)["distance"]
-                    shift = abs(balance(probe) - ref_balance)
-                    moved = changed_descriptors(ref_desc,
-                                                describe(probe, sr))
-                    if d > best:
-                        best, best_value, best_moved = d, value, moved
-                    best_bal = max(best_bal, shift)
-                spectral = best > threshold
-                stereo = best_bal > bal_threshold
-                verdict = "RESPONDS" if spectral or stereo else "INCONCLUSIVE"
-                how = "spectrum" if spectral else ("stereo" if stereo
-                                                   else "")
-                if stereo and "position" not in best_moved:
-                    best_moved["position"] = round(best_bal, 3)
-                results.append({
-                    "section": name, "param": ident,
-                    "addressed_by": how_sent, "address": address,
-                    "distance": round(best, 4),
-                    "balance_shift": round(best_bal, 4),
-                    "at_value": best_value, "verdict": verdict,
-                    "evidence": how, "changed": best_moved,
-                })
-                moved_text = ", ".join(sorted(best_moved)) or "-"
-                print(f"  [{done:3d}/{total}] {name}.{ident:<18} "
-                      f"{how_sent:<4} {str(address):>5}  d={best:7.4f}  "
-                      f"{verdict:<12} {moved_text}")
+        for name, ident in probing:
+            spec = sections[name][ident]
+            done += 1
+            cc = cc_of(spec)
+            pair = nrpn_of(spec)
+            if cc is None and pair is None:
+                results.append({"section": name, "param": ident,
+                                "verdict": "UNADDRESSABLE"})
+                continue
+            how_sent = "CC" if cc is not None else "NRPN"
+            address = cc if cc is not None else f"{pair[0]}:{pair[1]}"
+            best, best_value, best_bal = 0.0, None, 0.0
+            best_moved = {}
+            for value in probe_values(spec):
+                device.send_patch(sections, patch, skip=(name, ident))
+                device.send_param(spec, value)
+                time.sleep(0.05)
+                probe, _ = capture(device, args.audio_device,
+                                   args.seconds)
+                d = mstft_distance(ref, probe, sr)["distance"]
+                shift = abs(balance(probe) - ref_balance)
+                moved = changed_descriptors(ref_desc,
+                                            describe(probe, sr))
+                if d > best:
+                    best, best_value, best_moved = d, value, moved
+                best_bal = max(best_bal, shift)
+            spectral = best > threshold
+            stereo = best_bal > bal_threshold
+            verdict = "RESPONDS" if spectral or stereo else "INCONCLUSIVE"
+            how = "spectrum" if spectral else ("stereo" if stereo
+                                               else "")
+            if stereo and "position" not in best_moved:
+                best_moved["position"] = round(best_bal, 3)
+            results.append({
+                "section": name, "param": ident,
+                "addressed_by": how_sent, "address": address,
+                "distance": round(best, 4),
+                "balance_shift": round(best_bal, 4),
+                "at_value": best_value, "verdict": verdict,
+                "evidence": how, "changed": best_moved,
+            })
+            moved_text = ", ".join(sorted(best_moved)) or "-"
+            print(f"  [{done:3d}/{total}] {name}.{ident:<18} "
+                  f"{how_sent:<4} {str(address):>5}  d={best:7.4f}  "
+                  f"{verdict:<12} {moved_text}")
     finally:
         device.close(sections, patch)
 
@@ -459,7 +540,7 @@ def main():
                         "balance_mean": bal_mean, "balance_sd": bal_sd,
                         "balance_threshold": bal_threshold},
         "settings": {"seconds": args.seconds, "sigma": args.sigma,
-                     "gate_ms": args.gate_ms},
+                     "gate_ms": args.gate_ms, "profile": args.profile},
         "results": results,
     }
     if args.out:
