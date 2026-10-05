@@ -495,8 +495,16 @@ def align(audio, samplerate, keep=0.7, frac=0.05, window=None):
     return segment
 
 
-def capture(device, audio_device, seconds, window=None, attempts=3):
-    """Record one strike, retrying a refused device rather than aborting."""
+def capture(device, audio_device, seconds, window=None, attempts=3,
+            keep=0.7):
+    """Record one strike, retrying a refused device rather than aborting.
+
+    `keep` is how much of the note to hold after its onset. The default
+    suits a struck note, but anything with a tail longer than it is simply
+    discarded -- which made every delay echo and every reverb tail
+    unmeasurable, the echoes landing past the cut and T20 reading the same
+    55 ms at every decay setting because the window ended first.
+    """
     wait_for_silence(audio_device, device)
     for attempt in range(attempts):
         try:
@@ -510,7 +518,8 @@ def capture(device, audio_device, seconds, window=None, attempts=3):
             continue
         device.strike()
         audio, samplerate = rec.finish()
-        return align(audio, samplerate, window=window), samplerate
+        return (align(audio, samplerate, keep=keep, window=window),
+                samplerate)
 
 
 def measure_noise_floor(device, sections, patch, audio_device, seconds,

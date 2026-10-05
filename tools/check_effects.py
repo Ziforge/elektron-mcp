@@ -30,8 +30,6 @@ import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from rig_audio.analysis import decay_time_ms                 # noqa: E402
-
 from tools.sweep_device import (                             # noqa: E402
     AMP_PROFILES, Device, acquire_lock, baseline_for, capture,
     release_lock, sections_for,
@@ -42,7 +40,7 @@ def mono(audio):
     return audio.mean(axis=1) if audio.ndim > 1 else audio
 
 
-def echo_lag_ms(audio, samplerate, lo_ms=20.0, hi_ms=900.0):
+def echo_lag_ms(audio, samplerate, lo_ms=20.0, hi_ms=None):
     """Where the strongest repeat sits, by autocorrelation of the envelope.
 
     The envelope rather than the waveform, because a delay repeats the
@@ -59,6 +57,12 @@ def echo_lag_ms(audio, samplerate, lo_ms=20.0, hi_ms=900.0):
     if not np.any(env):
         return None
     corr = np.correlate(env, env, mode="full")[len(env) - 1:]
+    # Search as far as the recording allows. A fixed 900 ms ceiling made
+    # the two longest delay settings -- which sit past a second -- read as
+    # no echo at all and pulled the correlation negative, when the device
+    # was tracking its setting perfectly at about 11 ms per unit.
+    if hi_ms is None:
+        hi_ms = len(corr) * 0.9
     lo, hi = int(lo_ms), min(int(hi_ms), len(corr) - 1)
     if hi <= lo:
         return None
@@ -69,6 +73,27 @@ def echo_lag_ms(audio, samplerate, lo_ms=20.0, hi_ms=900.0):
     if corr[0] <= 0 or peak / corr[0] < 0.12:
         return None
     return float(lo + int(np.argmax(window)))
+
+
+def late_energy(audio, samplerate, start_ms=350.0, end_ms=2200.0):
+    """Energy well after the note, relative to the note itself.
+
+    This is what a reverb decay control changes. T20 cannot see it: it
+    measures a 20 dB fall from the peak, which the dry hit reaches long
+    before any tail matters, so T20 read the same 55 ms at every decay
+    setting and said nothing about the reverb at all.
+    """
+    x = np.abs(mono(audio))
+    if x.max() <= 0:
+        return 0.0
+    begin = int(start_ms / 1000 * samplerate)
+    finish = min(int(end_ms / 1000 * samplerate), len(x))
+    if finish <= begin:
+        return 0.0
+    head = x[:begin]
+    reference = float(np.sqrt(np.mean(head ** 2))) if len(head) else 0.0
+    tail = float(np.sqrt(np.mean(x[begin:finish] ** 2)))
+    return tail / reference if reference > 0 else 0.0
 
 
 def repeat_count(audio, samplerate, floor_db=-30.0):
@@ -120,6 +145,21 @@ def spearman(a, b):
     return 0.0 if da == 0 or db == 0 else num / (da * db)
 
 
+def spread(values):
+    """How far the measurement actually moved, as a fraction of its size.
+
+    Rank correlation says the response is ordered, not that it exists. Four
+    reverb tails measuring 55 ms apart from noise in the decimals ranked at
+    rho +0.949 and passed, which is a flat response dressed as a working
+    one. The measurement has to move as well as rank.
+    """
+    if not values:
+        return 0.0
+    lo, hi = min(values), max(values)
+    scale = max(abs(hi), abs(lo), 1e-9)
+    return (hi - lo) / scale
+
+
 def run(device, sections, patch, audio_device, section, ident, values,
         seconds, measure):
     """Set a parameter to each value and measure the result."""
@@ -129,7 +169,11 @@ def run(device, sections, patch, audio_device, section, ident, values,
         device.send_patch(sections, patch, skip=(section, ident))
         device.set_in(section, spec, value)
         time.sleep(0.08)
-        audio, sr = capture(device, audio_device, seconds)
+        # Keep nearly the whole recording: an effect's whole point is
+        # what happens after the note, and the default trim throws that
+        # away.
+        audio, sr = capture(device, audio_device, seconds,
+                            keep=seconds - 0.2)
         out.append((value, measure(audio, sr)))
     return out
 
@@ -180,9 +224,17 @@ def main():
         if len(got) < 3:
             failures.append("delay time: too few measurable repeats")
         else:
-            rho = spearman([v for v, _ in got], [lag for _, lag in got])
-            print(f"  rank correlation setting vs measured lag: {rho:+.3f}")
-            if rho < 0.8:
+            lags = [lag for _, lag in got]
+            rho = spearman([v for v, _ in got], lags)
+            moved = spread(lags)
+            print(f"  rank correlation setting vs measured lag: {rho:+.3f}"
+                  f", spacing spread {moved:.0%}")
+            if moved < 0.25:
+                failures.append(
+                    f"delay time: the measured spacing barely moves across "
+                    f"the range ({moved:.0%}), so nothing is tracking "
+                    f"anything")
+            elif rho < 0.8:
                 failures.append(
                     f"delay time: the measured spacing does not track the "
                     f"setting (rho {rho:+.3f})")
@@ -193,9 +245,15 @@ def main():
                    repeat_count)
         for value, n in rows:
             print(f"  FDBK {value:3d} -> {n} bursts")
-        rho = spearman([v for v, _ in rows], [n for _, n in rows])
-        print(f"  rank correlation: {rho:+.3f}")
-        if rho < 0.6:
+        counts = [n for _, n in rows]
+        rho = spearman([v for v, _ in rows], counts)
+        gained = max(counts) - min(counts)
+        print(f"  rank correlation: {rho:+.3f}, repeats gained {gained}")
+        if gained < 2:
+            failures.append(
+                f"delay feedback: only {gained} more repeat(s) across the "
+                f"whole range, which is not a feedback control working")
+        elif rho < 0.6:
             failures.append(
                 f"delay feedback: repeats do not increase with it "
                 f"(rho {rho:+.3f})")
@@ -207,17 +265,24 @@ def main():
                                      "lpf": 127})
         rows = run(device, sections, patch, args.audio_device,
                    "send_reverb", "dec", [10, 45, 80, 120], args.seconds,
-                   lambda a, sr: decay_time_ms(mono(a), sr))
-        for value, t20 in rows:
-            print(f"  DEC {value:3d} -> T20 "
-                  f"{t20:.0f} ms" if t20 else f"  DEC {value:3d} -> no T20")
-        got = [(v, t) for v, t in rows if t]
+                   late_energy)
+        for value, tail in rows:
+            print(f"  DEC {value:3d} -> late energy {tail:.4f}")
+        got = [(v, t) for v, t in rows if t is not None]
         if len(got) < 3:
             failures.append("reverb decay: too few measurable tails")
         else:
-            rho = spearman([v for v, _ in got], [t for _, t in got])
-            print(f"  rank correlation: {rho:+.3f}")
-            if rho < 0.8:
+            tails = [t for _, t in got]
+            rho = spearman([v for v, _ in got], tails)
+            moved = spread(tails)
+            print(f"  rank correlation: {rho:+.3f}, late-energy spread "
+                  f"{moved:.0%}")
+            if moved < 0.25:
+                failures.append(
+                    f"reverb decay: the tail length barely moves across "
+                    f"the range ({moved:.0%}); ranking alone would have "
+                    f"passed this")
+            elif rho < 0.8:
                 failures.append(
                     f"reverb decay: the tail does not lengthen with it "
                     f"(rho {rho:+.3f})")

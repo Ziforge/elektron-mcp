@@ -32,7 +32,40 @@ against Appendix C of the manual:
   by definition it needs two consecutive notes. A one-note probe cannot
   show it.
 
+## What the CC numbers already cover
+
+The machine and filter parameters are knob slots, not fixed controls.
+Appendix C.3 names them "Data entry knob A-H (machine dependent)" and C.4
+does the same for two of the filter slots: the CC numbers are identical
+whichever machine a track runs, and only the meaning changes.
+
+That matters for what counts as verified. `swarmer` and all six filter
+machines use CCs already covered by `fm_drum` and `filter_multi_mode`;
+`fm_tone` and `wavetone` reach exactly two slots the others do not, CC 60
+and 61. So hardware-verifying one machine verified the CC *numbers* for all
+four machines and all six filters, and the unverified CC surface is two
+numbers rather than the 183 parameters a naive count suggests.
+
+What stays unverified is the per-machine naming, which audio cannot
+establish in principle -- a knob slot responds identically whatever it is
+called. That comes from Appendix A, or from the device's own knobs.
+
+## The send effects, checked by their physics
+
+`tools/check_effects.py` asks whether an effect does what its name says
+rather than merely something, across a range of settings:
+
+| control | prediction | measured |
+|---|---|---|
+| DELAY TIME | echo spacing tracks the setting | 20 -> 232 ms, 45 -> 507 ms, 70 -> 783 ms |
+| DELAY FEEDBACK | more repeats | 4 -> 10 bursts |
+| REVERB DECAY | longer tail | late energy 0.0035 -> 0.1449, rho +1.000 |
+
+The delay is linear at about 11 ms per unit -- two consecutive steps of 25
+gave 275 ms and 276 ms. That is arithmetic, not "the sound changed".
+
 ## Three map bugs this found
+
 
 - **LFO 3 had invented CC numbers** (121–128). The manual lists no CC for
   LFO 3 at all, only NRPN. CC 123 is All Notes Off, so setting LFO 3 FADE
@@ -89,6 +122,41 @@ against Appendix C of the manual:
 - **A parameter verified in any pass is verified.** The baseline that
   reveals one can mask another: turning an LFO's depth up to expose its
   waveform leaves the depth itself near its limit.
+
+## Six wrong answers the harness gave before it was trusted
+
+Every one was in the measurement, none in the map. They are listed because
+each is a way a verification harness can produce confident nonsense:
+
+- **The spectral distance is level-invariant.** `mstft_distance`
+  RMS-normalises both signals, so a volume, a send or a compressor mix is
+  invisible to it. The one case where it appeared to catch a level change
+  was silence, where normalising divides by epsilon.
+- **Descriptor evidence was taken from one probe value only** -- whichever
+  moved the spectrum most -- so a parameter that changed the level at the
+  other end had that evidence collected and thrown away.
+- **Probes went to the wrong MIDI channel.** Resolved correctly when
+  sending the patch and not when sending the probe, so every send-effect
+  parameter landed on the track channel. It made the pattern volume read as
+  inert and an unconnected external input read as responding.
+- **Every recording was truncated 700 ms after the onset**, which discards
+  exactly what an effect does. Delay echoes landed past the cut and reverb
+  T20 read 55 ms at every decay setting.
+- **Rank correlation passed a flat response.** Tied values were given
+  distinct ranks, so a dead control scored a perfect 1.0; and near-ties
+  from noise in the decimals scored +0.949. Each check now requires the
+  measurement to move as well as rank.
+- **The echo search stopped at 900 ms**, so the two longest delay settings
+  read as no echo at all and pulled the correlation negative while the
+  device was tracking perfectly.
+
+Two process failures behind those: `str.replace` against a pattern an
+earlier edit had already changed does nothing, and twice a fix announced as
+applied was never in the file. Every edit now asserts its replacement
+landed. And `pkill` killed the `uv` wrapper while leaving Python children
+alive, so three sweeps ran at once on one MIDI port; a single-instance lock
+and signal handling now prevent both the corruption and leaving the
+instrument silent.
 
 ## Not yet verified
 

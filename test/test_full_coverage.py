@@ -270,3 +270,39 @@ def test_external_in_names_each_control_once():
     setting either move the other."""
     ccs = [int(s["cc_msb"]) for s in SECTIONS["external_in"].values()]
     assert len(ccs) == len(set(ccs))
+
+
+def test_machines_share_their_cc_numbers():
+    """The machine parameters are knob slots, not fixed controls.
+
+    Appendix C.3 names them "Data entry knob A-H (machine dependent)": the
+    CC numbers are the same whichever machine a track runs, and only the
+    meaning changes. So hardware-verifying one machine's CCs verifies the
+    numbers for all of them, and what stays unverified by audio is the
+    naming -- which audio could never establish anyway.
+
+    fm_tone and wavetone reach two slots the others do not, CC 60 and 61.
+    """
+    def ccs(name):
+        return {int(s["cc_msb"]) for s in SECTIONS[name].values()
+                if "cc_msb" in s}
+
+    drum = ccs("fm_drum")
+    assert ccs("swarmer") <= drum
+    assert ccs("fm_tone") - drum == {60, 61}
+    assert ccs("wavetone") - drum == {60, 61}
+
+
+def test_every_filter_machine_uses_the_same_ccs():
+    """Same reasoning: CC 17 and 18 are Appendix C.4's "Data entry knob F
+    and G (machine dependent)", so the six filters differ in meaning, not
+    in address."""
+    def ccs(name):
+        return {int(s["cc_msb"]) for s in SECTIONS[name].values()
+                if "cc_msb" in s}
+
+    multi = ccs("filter_multi_mode")
+    for name in ("filter_lowpass4", "filter_equalizer",
+                 "filter_legacy_lp_hp", "filter_comb_minus",
+                 "filter_comb_plus"):
+        assert ccs(name) <= multi, name

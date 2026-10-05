@@ -99,3 +99,49 @@ def test_rank_correlation_behaves():
 def test_a_flat_response_fails_the_correlation():
     """A parameter that changes nothing must not pass as working."""
     assert fx.spearman([1, 2, 3, 4], [5, 5, 5, 5]) == 0.0
+
+
+def test_spread_measures_how_far_a_reading_moved():
+    assert fx.spread([55.0, 55.1, 55.0, 55.2]) < 0.01
+    assert fx.spread([60.0, 500.0]) > 0.8
+    assert fx.spread([]) == 0.0
+
+
+def test_a_near_flat_response_must_not_pass_on_ranking_alone():
+    """Four reverb tails measuring 55 ms, differing only by noise in the
+    decimals, ranked at rho +0.949 and passed. Ranking says the response
+    is ordered, not that there is one."""
+    tails = [55.02, 55.07, 55.11, 55.19]
+    assert fx.spearman([10, 45, 80, 120], tails) > 0.9
+    assert fx.spread(tails) < 0.25
+
+
+def test_late_energy_rises_with_a_longer_tail():
+    """What the reverb check rests on. T20 could not see this: the dry hit
+    falls 20 dB long before any tail matters, so T20 read the same 55 ms at
+    every decay setting."""
+    readings = []
+    for tau_ms in (40, 400, 1500):
+        t = np.arange(int(2.4 * SR)) / SR
+        rng = np.random.default_rng(3)
+        hit = rng.standard_normal(len(t)) * np.exp(-t / 0.03)
+        tail = rng.standard_normal(len(t)) * np.exp(-t / (tau_ms / 1000))
+        audio = np.stack([hit + tail * 0.3] * 2, axis=1)
+        readings.append(fx.late_energy(audio, SR))
+    assert readings[0] < readings[1] < readings[2], readings
+    assert fx.spread(readings) > 0.25
+
+
+def test_late_energy_is_zero_for_silence_and_for_a_bare_hit():
+    assert fx.late_energy(np.zeros((SR, 2)), SR) == 0.0
+    t = np.arange(int(2.4 * SR)) / SR
+    bare = np.exp(-t / 0.02) * np.random.default_rng(4).standard_normal(len(t))
+    assert fx.late_energy(np.stack([bare] * 2, axis=1), SR) < 0.05
+
+
+def test_the_echo_search_reaches_past_a_second():
+    """A fixed 900 ms ceiling made the two longest delay settings read as
+    no echo at all, when the device was tracking at about 11 ms per unit."""
+    measured = fx.echo_lag_ms(_echoes(1100, count=3, total_ms=4000), SR)
+    assert measured is not None
+    assert abs(measured - 1100) / 1100 < 0.1, measured
