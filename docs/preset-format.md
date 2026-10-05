@@ -34,9 +34,10 @@ Plain, legible JSON — fully authorable:
 `ProductType` 43 is the Digitone II, matching Elektroid's device table.
 `FileType` is `Sound` for a preset. Tags are the ones shown on the device.
 
-## Parameter payload (not yet decoded)
+## Parameter payload (FM Drum: decoded)
 
-334 bytes for one Sound. Structure visible so far:
+Payload length varies by machine: 334 bytes for a WAVETONE/FM TONE preset,
+271 bytes for an FM DRUM one. Structure:
 
 - `ac 11 d3 03` at offset 0 — magic or format version.
 - An ASCII version-like string (`0059`) near offset 11.
@@ -45,20 +46,59 @@ Plain, legible JSON — fully authorable:
 - 110 zero bytes, 109 distinct values, 39 bytes above 0x7F, so this is raw
   binary rather than the 7-bit-safe encoding used on the wire.
 
-## How to decode it
+## The parameter block
 
-The cheap route needs one preset saved on the device whose parameter values
-are already known, which makes the payload a Rosetta Stone:
+Parameters are a contiguous array of **16-bit words**, one per parameter, with
+the 7-bit MIDI value in the **odd (second) byte** of each word:
 
-1. Send a patch over CC, so every value is known (see the patch store).
-2. Save it on the device, download it, unzip it.
-3. Locate each parameter by searching the payload for its known value.
-4. Verify by synthesising a modified preset, uploading it to a spare slot,
-   loading it and auditioning: the measured sound must match what the bytes
-   claim. The audio loop is the test harness.
+```
+offset 85 + (n * 2)  ->  parameter n
+```
 
-Ambiguity is expected where several parameters share a value, so vary a few
-deliberately to unique values before saving.
+For FM DRUM the order matches the device's own page layout exactly, and all
+30 parameters were located with no ambiguity:
+
+| offset | parameter | | offset | parameter |
+|---|---|---|---|---|
+| 85 | tune | | 115 | mod2 |
+| 87 | stim | | 117 | hold |
+| 89 | sdep | | 119 | tran |
+| 91 | fold | | 121 | base |
+| 93 | algo | | 123 | wdth |
+| 95 | fdbk | | 125 | ndec |
+| 97 | op_c | | 127 | nlev |
+| 99 | op_ab | | 129 | tlev |
+| 101 | dec1 | | 131 | dec |
+| 103 | end1 | | 133 | lev |
+| 105 | ratio1 | | 135 | ph_c |
+| 107 | mod1 | | 137 | nrst |
+| 109 | dec2 | | 139 | nrm |
+| 111 | end2 | | 141 | nhld |
+| 113 | ratio2 | | 143 | gran |
+
+Note `fold` precedes `algo` and `ratio1` follows `end1`, which is not the
+order the parameter maps in this repo list them in -- the payload follows the
+device's page layout, not the CC numbering.
+
+### How this was established
+
+A calibration patch was sent over CC giving every parameter a distinct value,
+saved on the device once, downloaded and unzipped. Each parameter was then
+located by searching the payload for its known value. Restricting the search
+to odd offsets inside the block removed every spurious match, including for
+the 0/1 toggles whose values appear all over the file.
+
+Worth repeating per machine: FM TONE, WAVETONE and SWARMER will have their
+own orders and payload lengths. The same calibration method applies.
+
+### Still unknown
+
+- Bytes before offset 85: a header carrying magic (`ac 11 d3 03`), a marker
+  (`be ef ba ce`), a version-like ASCII string and the preset name.
+- Whether the even byte of each word is ever non-zero, i.e. whether any
+  parameter exceeds 7 bits in storage.
+- The filter, amp, FX and LFO blocks, which were part of the same calibration
+  but have not yet been located.
 
 ## What this unlocks
 
