@@ -11,19 +11,35 @@ import time
 from elektron_mcp.audio import analysis, capture
 
 
+def _play(midi, track, note, velocity, duration_ms, tail_ms):
+    midi.send_note_on(track, note, velocity)
+    time.sleep(duration_ms / 1000.0)
+    midi.send_note_off(track, note)
+    time.sleep(tail_ms / 1000.0)
+
+
 def _trigger_and_capture(midi, track, note, velocity, duration_ms, tail_ms, device):
     """Record across the whole event, starting before the note.
 
     The attack is the most informative part of a percussive sound, so
     recording has to begin before the trigger rather than after it.
+
+    Tries an in-process stream first because it is faster, then falls back to
+    recording in a child process: a long-lived server can end up unable to
+    reopen the device at all, while a fresh process always can.
     """
-    with capture.Recorder(device=device) as rec:
-        time.sleep(0.08)  # let the stream settle before the note
-        midi.send_note_on(track, note, velocity)
-        time.sleep(duration_ms / 1000.0)
-        midi.send_note_off(track, note)
-        time.sleep(tail_ms / 1000.0)
-        return rec.audio, rec.samplerate
+    settle = 0.08
+    try:
+        with capture.Recorder(device=device) as rec:
+            time.sleep(settle)
+            _play(midi, track, note, velocity, duration_ms, tail_ms)
+            return rec.audio, rec.samplerate
+    except capture.CaptureError:
+        total = settle + (duration_ms + tail_ms) / 1000.0 + 0.1
+        rec = capture.SubprocessRecorder(total, device=device).start()
+        time.sleep(settle)
+        _play(midi, track, note, velocity, duration_ms, tail_ms)
+        return rec.finish()
 
 
 def register_audition_tools(mcp, midi):
@@ -132,18 +148,28 @@ def register_audition_tools(mcp, midi):
         gate = max(0.05, min(1.0, gate))
         steps = list(notes) * repeats
 
+        def _run():
+            on_ms = step_ms * gate
+            for i, n in enumerate(steps):
+                vel = velocities[i % len(velocities)] if velocities else 100
+                midi.send_note_on(track, n, vel)
+                time.sleep(on_ms / 1000.0)
+                midi.send_note_off(track, n)
+                time.sleep((step_ms - on_ms) / 1000.0)
+            time.sleep(0.4)
+
         try:
-            with capture.Recorder(device=device) as rec:
+            try:
+                with capture.Recorder(device=device) as rec:
+                    time.sleep(0.08)
+                    _run()
+                    audio, sr = rec.audio, rec.samplerate
+            except capture.CaptureError:
+                total = 0.08 + len(steps) * step_ms / 1000.0 + 0.5
+                rec = capture.SubprocessRecorder(total, device=device).start()
                 time.sleep(0.08)
-                on_ms = step_ms * gate
-                for i, n in enumerate(steps):
-                    vel = velocities[i % len(velocities)] if velocities else 100
-                    midi.send_note_on(track, n, vel)
-                    time.sleep(on_ms / 1000.0)
-                    midi.send_note_off(track, n)
-                    time.sleep((step_ms - on_ms) / 1000.0)
-                time.sleep(0.4)
-                audio, sr = rec.audio, rec.samplerate
+                _run()
+                audio, sr = rec.finish()
         except capture.CaptureError as e:
             return {"error": str(e), "inputs": capture.list_input_devices()}
 
@@ -176,7 +202,12 @@ def register_audition_tools(mcp, midi):
             dict: Descriptors for the captured audio.
         """
         try:
-            audio, sr = capture.record(seconds, device=device)
+            try:
+                audio, sr = capture.record(seconds, device=device)
+            except capture.CaptureError:
+                audio, sr = capture.SubprocessRecorder(
+                    seconds, device=device
+                ).start().finish()
         except capture.CaptureError as e:
             return {"error": str(e), "inputs": capture.list_input_devices()}
 

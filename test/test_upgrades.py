@@ -278,3 +278,74 @@ def test_apply_reports_display_values_out_of_range():
     out = section_tool._apply(midi, "fm_drum", 1, {"tune": 500}, units="display")
     assert "tune" in out["out_of_range"]
     assert out["sent"] == {}
+
+
+class FakeNoteMidi:
+    """Records notes without touching hardware."""
+
+    def __init__(self):
+        self.notes = []
+
+    def send_note_on(self, track, note, velocity):
+        self.notes.append(("on", track, note, velocity))
+        return True
+
+    def send_note_off(self, track, note):
+        self.notes.append(("off", track, note))
+        return True
+
+
+def test_trigger_falls_back_to_a_child_process(monkeypatch):
+    """A long-lived server can lose the ability to reopen the audio device.
+
+    The note must still be played, and the capture must still be returned,
+    via the subprocess path.
+    """
+    from elektron_mcp.tools import audition_tool
+
+    class BrokenRecorder:
+        def __init__(self, *a, **k):
+            pass
+
+        def __enter__(self):
+            raise capture.CaptureError("simulated paInternalError -9986")
+
+        def __exit__(self, *exc):
+            return False
+
+    seen = {}
+
+    class FakeSubprocessRecorder:
+        def __init__(self, seconds, device=None, **k):
+            seen["seconds"] = seconds
+
+        def start(self):
+            seen["started"] = True
+            return self
+
+        def finish(self):
+            return np.zeros((480, 2), dtype=np.float32), 48000
+
+    monkeypatch.setattr(capture, "Recorder", BrokenRecorder)
+    monkeypatch.setattr(capture, "SubprocessRecorder", FakeSubprocessRecorder)
+
+    midi = FakeNoteMidi()
+    audio, sr = audition_tool._trigger_and_capture(
+        midi, 3, 84, 100, 20, 20, "device"
+    )
+
+    assert seen.get("started") is True
+    assert sr == 48000 and len(audio) == 480
+    # The window has to cover settle + note + tail, not just the note.
+    assert seen["seconds"] > 0.04
+    assert ("on", 3, 84, 100) in midi.notes and ("off", 3, 84) in midi.notes
+
+
+def test_subprocess_recorder_reports_a_bad_device():
+    with pytest.raises(capture.CaptureError):
+        capture.SubprocessRecorder(0.1, device="No Such Device 99999").start()
+
+
+def test_subprocess_recorder_errors_if_never_started():
+    with pytest.raises(capture.CaptureError):
+        capture.SubprocessRecorder(0.1).finish()

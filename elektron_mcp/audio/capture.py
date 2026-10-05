@@ -8,6 +8,8 @@ note is triggered.
 """
 
 import logging
+import os
+import time
 import wave
 from pathlib import Path
 
@@ -22,6 +24,26 @@ MAX_SECONDS = 30.0
 
 class CaptureError(RuntimeError):
     """Raised when no audio could be captured."""
+
+
+def _reinit_portaudio() -> None:
+    """Tear down and restart PortAudio.
+
+    In a long-lived server process, CoreAudio refuses to reopen a device
+    after a previous stream closed, failing with paInternalError (-9986).
+    The same device opens fine in a fresh process, so the fault is PortAudio's
+    cached state rather than the device. Reinitialising clears it.
+    """
+    import sounddevice as sd
+
+    try:
+        sd._terminate()
+    except Exception as e:
+        logger.debug(f"PortAudio terminate failed: {e}")
+    try:
+        sd._initialize()
+    except Exception as e:
+        logger.debug(f"PortAudio initialize failed: {e}")
 
 
 def list_input_devices() -> list[dict]:
@@ -50,7 +72,8 @@ def record(
     import sounddevice as sd
 
     seconds = max(0.01, min(MAX_SECONDS, float(seconds)))
-    try:
+
+    def _attempt():
         buf = sd.rec(
             int(samplerate * seconds),
             samplerate=samplerate,
@@ -59,8 +82,17 @@ def record(
             dtype="float32",
         )
         sd.wait()
-    except Exception as e:
-        raise CaptureError(f"capture from {device!r} failed: {e}") from e
+        return buf
+
+    try:
+        buf = _attempt()
+    except Exception as first:
+        logger.debug(f"capture failed ({first}); reinitialising PortAudio")
+        _reinit_portaudio()
+        try:
+            buf = _attempt()
+        except Exception as e:
+            raise CaptureError(f"capture from {device!r} failed: {e}") from e
     return np.asarray(buf), samplerate
 
 
@@ -92,17 +124,26 @@ class Recorder:
                 logger.debug(f"capture status: {status}")
             self._blocks.append(indata.copy())
 
-        try:
-            self._stream = sd.InputStream(
+        def _open():
+            stream = sd.InputStream(
                 samplerate=self.samplerate,
                 channels=self.channels,
                 device=self.device,
                 dtype="float32",
                 callback=callback,
             )
-            self._stream.start()
-        except Exception as e:
-            raise CaptureError(f"could not open {self.device!r}: {e}") from e
+            stream.start()
+            return stream
+
+        try:
+            self._stream = _open()
+        except Exception as first:
+            logger.debug(f"stream open failed ({first}); reinitialising PortAudio")
+            _reinit_portaudio()
+            try:
+                self._stream = _open()
+            except Exception as e:
+                raise CaptureError(f"could not open {self.device!r}: {e}") from e
         return self
 
     def __exit__(self, *exc):
@@ -150,3 +191,95 @@ def load_wav(path: str | Path) -> tuple[np.ndarray, int]:
     if ch > 1:
         audio = audio.reshape(-1, ch)
     return audio, sr
+
+# --- Subprocess capture -------------------------------------------------
+# In a long-lived server process CoreAudio can refuse to reopen the device
+# after a stream closes, failing with paInternalError (-9986), while a fresh
+# process opens the same device without complaint. Reinitialising PortAudio
+# in-process does not reliably clear it, so capture falls back to doing the
+# recording in a short-lived child process, which is the one approach the
+# evidence actually supports.
+
+
+_CHILD = r"""
+import sys, wave
+import numpy as np, sounddevice as sd
+seconds, device, sr, ch, path = (
+    float(sys.argv[1]), sys.argv[2], int(sys.argv[3]),
+    int(sys.argv[4]), sys.argv[5],
+)
+stream = sd.InputStream(samplerate=sr, channels=ch, device=device,
+                        dtype="float32")
+stream.start()
+print("READY", flush=True)
+frames = stream.read(int(sr * seconds))[0]
+stream.stop(); stream.close()
+pcm = (np.clip(frames, -1.0, 1.0) * 32767).astype("<i2")
+with wave.open(path, "wb") as w:
+    w.setnchannels(ch); w.setsampwidth(2); w.setframerate(sr)
+    w.writeframes(pcm.tobytes())
+print("DONE", flush=True)
+"""
+
+
+class SubprocessRecorder:
+    """Record in a child process, so the parent can trigger a note mid-capture.
+
+    start() returns only once the child reports its stream is open, so the
+    trigger never races the start of recording.
+    """
+
+    def __init__(
+        self,
+        seconds: float,
+        device: str | int = DEFAULT_DEVICE,
+        samplerate: int = DEFAULT_SR,
+        channels: int = 2,
+    ):
+        self.seconds = max(0.05, min(MAX_SECONDS, float(seconds)))
+        self.device = device
+        self.samplerate = samplerate
+        self.channels = channels
+        self._proc = None
+        self._path = None
+
+    def start(self, timeout: float = 15.0) -> "SubprocessRecorder":
+        import subprocess
+        import sys
+        import tempfile
+
+        fd, self._path = tempfile.mkstemp(suffix=".wav")
+        os.close(fd)
+        self._proc = subprocess.Popen(
+            [sys.executable, "-c", _CHILD, str(self.seconds),
+             str(self.device), str(self.samplerate), str(self.channels),
+             self._path],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        )
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            line = self._proc.stdout.readline()
+            if line.strip() == "READY":
+                return self
+            if not line and self._proc.poll() is not None:
+                err = (self._proc.stderr.read() or "").strip()
+                raise CaptureError(f"capture subprocess failed: {err}")
+        raise CaptureError("capture subprocess did not become ready in time")
+
+    def finish(self, timeout: float = 30.0) -> tuple[np.ndarray, int]:
+        if self._proc is None:
+            raise CaptureError("recorder was never started")
+        try:
+            _, err = self._proc.communicate(timeout=timeout)
+        except Exception as e:
+            self._proc.kill()
+            raise CaptureError(f"capture subprocess hung: {e}") from e
+        if self._proc.returncode != 0:
+            raise CaptureError(f"capture subprocess failed: {(err or '').strip()}")
+        try:
+            return load_wav(self._path)
+        finally:
+            try:
+                os.unlink(self._path)
+            except OSError:
+                pass

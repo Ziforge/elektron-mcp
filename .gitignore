@@ -13,3 +13,7 @@ wheels/
 .venv
 
 # Project-specific files
+
+# Vendor documentation (Elektron copyright) -- not ours to redistribute
+docs/*.pdf
+docs/*.txt
