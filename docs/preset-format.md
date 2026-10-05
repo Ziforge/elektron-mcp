@@ -160,59 +160,60 @@ the calibrated 271 bytes, and `save_current_as_preset` reads back what the
 device actually stored and reports whether the parameters survived, rather
 than trusting an accepted upload.
 
-## Writing parameters: what the probes established
+## Writing parameters: solved
 
-Single-variable uploads to a scratch slot, each one verified by downloading
-what the device stored.
+All 30 FM DRUM parameters write correctly and round-trip through the device.
+Verified by building a preset from parameter values, uploading it, downloading
+it back and comparing: 30 of 30, no mismatches, payload length preserved.
 
-**The round trip is lossless.** Uploading a preset byte-for-byte as the
-device supplied it returns the same 271 bytes with exactly one byte changed:
-offset 24, which behaves as a save counter. So any other difference is
-attributable to the edit, and the body is not re-encoded in general. An
-earlier version of this document concluded the opposite; that was wrong.
+### The rule
 
-**A non-zero write lands exactly.** Changing one parameter byte to a non-zero
-value returns the same length with that byte changed and nothing else moved
-(bar the CRC, which the device recomputes). The offsets are correct.
+Values are stored at **variable width**, and changing a value's encoded width
+shifts every parameter after it. Probed one variable at a time:
 
-**A zero costs one byte.** Writing 0 into a parameter returns a payload one
-byte shorter, with everything after that point shifted. Zeros are stored
-compactly rather than as a full 16-bit word. This is what made the first
-attempt fail: the patch contained five zero values and the device returned a
-payload exactly five bytes shorter.
+| edit | returned | result |
+|---|---|---|
+| `nrst` 0 -> 1 | 271 B | landed, nothing moved |
+| `nrm` 1 -> 0 | 273 B | grew two bytes, everything after shifted |
+| `gran` 29 -> 77 | 271 B | landed, nothing moved |
+| `gran` 29 -> 0 | 270 B | shrank one byte, everything after shifted |
 
-**Substituting 1 for 0 is not sufficient.** Writing all 30 values with zeros
-replaced by 1 landed 26 of 30, including the whole of page 1, which had never
-worked before. Four drifted: ph_c came back as 0 despite being sent as 1, and
-the three parameters after it shifted by one slot -- consistent with ph_c
-being normalised to 0 and then stored compactly. So some parameters constrain
-or normalise their value, and a normalised 0 re-triggers the compaction.
+Note `nrm` -> 0 made the payload **longer**. So it is not that zeros are
+stored compactly, and not that the 0/1 toggles are a different type -- both
+were wrong intermediate theories. Writing a value whose encoded width differs
+from the one already present is the only hazard.
 
-### State
+Going *to* zero from a non-zero value is the common case that changes width,
+so the writer raises those to 1 and reports it. Where the template already
+holds zero, writing zero is a no-op and is left alone -- which is why a patch
+wanting `nrst=0` gets exactly that.
 
-- 26 of 30 FM DRUM parameters are writable today.
-- The remaining few need one probe sweep each: write every value across the
-  parameter's range, see which are stored verbatim and which normalise.
-- At roughly fifteen seconds per probe this is bounded work, and the harness
-  does it reliably: upload, download, compare.
+### What made the difference
 
-### Method that worked
+Five hypotheses were tested by inspection and all rejected: checksum
+placement, a trailing footer hash, deflate stored-block framing, a zlib
+stream in the payload, and wholesale re-encoding by the device. None survived.
 
-Change exactly one thing per upload and verify against what the device
-stored. Five hypotheses were tested and rejected by inspection alone
-(checksum location, trailing footer hash, stored-deflate framing, zlib in the
-payload, wholesale re-encoding). None survived contact. The single-variable
-probe found the mechanism in two uploads.
+The control experiment that should have come first: upload a preset
+byte-for-byte as the device supplied it. It returns identical but for one byte
+at offset 24, a save counter. That immediately disproved "the device
+re-encodes the body" and made every later comparison interpretable.
 
-## What works today
+After that, single-variable probes found the mechanism in four uploads.
 
-- Download, back up, copy and clear presets and projects on the device.
-- Read a device-produced preset's parameters at the calibrated payload length.
-- Compute and reseal the content hash, so an edited preset is accepted.
-- Write non-zero parameter values, verified by read-back.
-- `apply_parameters` refuses an uncalibrated payload length, and
-  `save_current_as_preset` reports whether the parameters actually survived
-  rather than trusting an accepted upload.
+## What works
 
-For keeping a sound, the patch store remains the reliable route: it replays
-the values over CC in about a second.
+- Download, back up, copy and clear presets and projects.
+- Read a device-produced preset's parameters.
+- Compute and reseal the content hash so an edited preset is accepted.
+- **Write all 30 FM DRUM parameters and save a sound to a device slot with no
+  interaction with the device.**
+- `save_current_as_preset` reads back what the device stored and reports
+  whether the parameters survived, rather than trusting an accepted upload.
+
+### Limits
+
+- Only FM DRUM is calibrated. Other machines have their own payload order and
+  length; each needs one calibration save.
+- A value going to zero is raised to 1 unless the template already holds zero.
+- The header is templated from a real preset rather than synthesised.

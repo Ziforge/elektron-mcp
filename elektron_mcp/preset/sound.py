@@ -49,6 +49,23 @@ MACHINE_LAYOUTS = {"fm_drum": (BLOCK_START, STRIDE, FM_DRUM_ORDER)}
 # absolute offset is only trustworthy for a payload of the calibrated length.
 CALIBRATED_PAYLOAD_LEN = 271
 
+# Every parameter is writable, but values are stored at variable width, and
+# CHANGING a value's width shifts every parameter after it. Probed directly:
+#
+#   nrst 0 -> 1        271 bytes, landed, nothing moved
+#   nrm  1 -> 0        273 bytes, grew by two, everything after shifted
+#   gran 29 -> 77      271 bytes, landed, nothing moved
+#   gran 29 -> 0       270 bytes, shrank by one, everything after shifted
+#
+# So it is not that zeros are small or that toggles are special: writing a
+# value whose encoded width differs from the one already there is what breaks
+# the layout. A zero is simply the value whose width most often differs.
+#
+# Safest rule available without implementing the encoding: write the value,
+# then verify by read-back, and treat a payload length change as the signal
+# that the write was unsafe. save_current_as_preset does exactly that.
+WIDTH_SENSITIVE = True
+
 
 class PresetError(RuntimeError):
     """Raised when a preset cannot be read or written."""
@@ -121,17 +138,20 @@ def apply_parameters(payload: bytes, values: dict[str, int],
         )
     buf = bytearray(payload)
     known = offsets(machine)
-    unknown = []
+    unknown, widened = [], []
     for name, value in values.items():
         off = known.get(name)
-        if off is None:
+        if off is None or off >= len(buf):
             unknown.append(name)
             continue
-        if off >= len(buf):
-            unknown.append(name)
-            continue
-        buf[off] = max(0, min(127, int(value)))
-    return bytes(buf), unknown
+        v = max(0, min(127, int(value)))
+        if v == 0 and buf[off] != 0:
+            # Going to zero changes the encoded width and shifts everything
+            # after it. 1 is the nearest value that does not.
+            widened.append(name)
+            v = 1
+        buf[off] = v
+    return bytes(buf), unknown + [f"{n} (0 raised to 1)" for n in widened]
 
 
 def content_crc(payload: bytes) -> int:

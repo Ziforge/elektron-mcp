@@ -71,11 +71,14 @@ def test_apply_changes_only_the_named_bytes(tmp_path):
 
 def test_apply_clamps_and_reports_unknown_names(tmp_path):
     original = sound.read(_synthetic(tmp_path))["payload"]
-    changed, unknown = sound.apply_parameters(
+    changed, notes = sound.apply_parameters(
         original, {"gran": 999, "nlev": -5, "not_a_param": 1})
-    assert unknown == ["not_a_param"]
+    assert "not_a_param" in notes
     offs = sound.offsets()
-    assert changed[offs["gran"]] == 127 and changed[offs["nlev"]] == 0
+    assert changed[offs["gran"]] == 127
+    # -5 clamps to 0, which is then raised to 1 because a stored zero
+    # shortens the payload and shifts everything after it.
+    assert changed[offs["nlev"]] == 1
 
 
 def test_rename_preserves_payload_length(tmp_path):
@@ -186,7 +189,38 @@ def test_real_preset_decodes_to_the_values_that_were_sent():
 @pytest.mark.skipif(not REAL.is_file(), reason="calibration download absent")
 def test_real_preset_rewrites_byte_identically():
     original = sound.read(REAL)
-    rewritten, unknown = sound.apply_parameters(
+    rewritten, notes = sound.apply_parameters(
         original["payload"], original["parameters"])
-    assert unknown == []
-    assert rewritten == original["payload"]
+    # The two toggles are skipped rather than written, so they are reported;
+    # they keep the template's values, which is what makes the rest land.
+    assert all("raised to 1" in n for n in notes)
+    writable = list(sound.FM_DRUM_ORDER)
+    offs = sound.offsets()
+    for name in writable:
+        if original["parameters"][name] != 0:
+            assert rewritten[offs[name]] == original["parameters"][name]
+
+
+def test_every_parameter_is_writable(tmp_path):
+    """Probing showed nrst 0->1 lands with nothing shifted, so excluding the
+    toggles was wrong. The hazard is changing a value's encoded WIDTH, not
+    which parameter it is."""
+    original = sound.read(_synthetic(tmp_path))["payload"]
+    changed, _ = sound.apply_parameters(
+        original, {"nrst": 1, "nrm": 1, "gran": 99})
+    offs = sound.offsets()
+    assert changed[offs["nrst"]] == 1
+    assert changed[offs["nrm"]] == 1
+    assert changed[offs["gran"]] == 99
+
+
+def test_zero_is_raised_to_one_and_reported(tmp_path):
+    """A zero is stored compactly, costing a byte and shifting what follows."""
+    original = sound.read(_synthetic(tmp_path))["payload"]
+    changed, notes = sound.apply_parameters(original, {"gran": 0})
+    assert changed[sound.offsets()["gran"]] == 1
+    assert any("0 raised to 1" in n for n in notes)
+
+
+def test_all_thirty_parameters_are_writable():
+    assert len(sound.FM_DRUM_ORDER) == 30
