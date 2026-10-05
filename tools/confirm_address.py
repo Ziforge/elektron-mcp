@@ -64,7 +64,7 @@ GENERIC_STABILISE_NRPN = (
 
 class Plain:
     def __init__(self, port_match, channel, note, velocity, gate_ms,
-                 retrigger_ms=0):
+                 retrigger_ms=0, retrigger_note=0):
         name = next(p for p in mido.get_output_names() if port_match in p)
         self.port = mido.open_output(name)
         self.channel = channel - 1
@@ -72,6 +72,7 @@ class Plain:
         self.velocity = velocity
         self.gate_ms = gate_ms
         self.retrigger_ms = retrigger_ms
+        self.retrigger_note = retrigger_note
 
     def silence(self):
         for control in (123, 120):
@@ -88,12 +89,13 @@ class Plain:
                                     note=self.note))
         if self.retrigger_ms:
             time.sleep(self.retrigger_ms / 1000.0)
+            second = self.retrigger_note or self.note
             self.port.send(mido.Message(
-                "note_on", channel=self.channel, note=self.note,
+                "note_on", channel=self.channel, note=second,
                 velocity=self.velocity))
             time.sleep(self.gate_ms / 1000.0)
             self.port.send(mido.Message("note_off", channel=self.channel,
-                                        note=self.note))
+                                        note=second))
 
     def cc(self, control, value):
         self.port.send(mido.Message("control_change", channel=self.channel,
@@ -137,6 +139,12 @@ def main():
     ap.add_argument("--velocity", type=int, default=110)
     ap.add_argument("--gate-ms", type=int, default=250)
     ap.add_argument("--retrigger-ms", type=int, default=0)
+    ap.add_argument("--retrigger-note", type=int, default=0,
+                    help="pitch for the second strike. Portamento only "
+                         "shows between two different notes, and it is the "
+                         "one trig parameter that is audible at all -- "
+                         "which makes it the only way to test whether NRPN "
+                         "bank 3 is reaching the device")
     ap.add_argument("--seconds", type=float, default=1.4)
     ap.add_argument("--keep", type=float, default=1.1)
     ap.add_argument("--repeats", type=int, default=12)
@@ -166,7 +174,7 @@ def main():
 
     voice_channel = args.note_channel or args.channel
     device = Plain(args.port, voice_channel, args.note, args.velocity,
-                   args.gate_ms, args.retrigger_ms)
+                   args.gate_ms, args.retrigger_ms, args.retrigger_note)
     probe_channel = args.channel - 1
 
     note_holds = []

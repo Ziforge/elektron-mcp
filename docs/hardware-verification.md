@@ -44,17 +44,35 @@ for structural reasons, not for want of effort:
   and nothing is plugged in. Correctly silent; this is the map being right,
   not unverified.
 - **`trig` 6 and `euclid` 7.** Sequencer-domain: they govern what a
-  pattern plays, and an incoming MIDI note bypasses them. Driving the
-  device's own sequencer gets the pattern playing -- it does follow MIDI
-  transport -- but the bar-to-bar floor will not go below about 0.5, and
-  parameter locks are the likely reason: a p-lock overrides whatever CC
-  arrives, per step. Settling these means either editing the pattern or
-  reading the device's knob output.
-- **The two mutes, CC 94 and CC 110.** These do not respond over MIDI at
-  all, by CC or by NRPN 1:108, with every track muted and the pattern still
-  playing at full level. Both numbers are from Appendix C, so the map
-  matches the manual; the manual is not reproducible here. Recorded as a
-  discrepancy rather than a pending task.
+  pattern plays, and an incoming MIDI note bypasses them. Two methods were
+  tried and both exhausted. Driving the device's own sequencer works -- it
+  follows MIDI transport -- but a spectral comparison of one bar against
+  the next cannot settle them: the floor will not fall below about 0.5,
+  because a p-locked pattern and a random-phase voice both make one bar
+  genuinely differ from the next.
+
+  Counting trigs instead is the right question for the euclidean
+  generators, since their whole job is deciding how many steps fire, and
+  counting is immune to p-locks: a lock changes how a hit sounds, not
+  whether it happens. With euclid mode held on, none of them moved the
+  count beyond its noise -- ranges of 1 to 6 against a spread of 4. So the
+  euclidean parameters are not reaching the device at all.
+
+  All seven are NRPN bank 3, and bank 3 has never been shown to work.
+  Bank 1 has: LFO 3 responds on 1:72. The one bank-3 parameter that is
+  audible in principle is portamento, CC 9 and 65 with NRPN 3:6 and 3:7,
+  which glides pitch between two different notes -- but it reads 0.29 to
+  0.34 against a 0.54 bar on FM DRUM, where portamento may simply do
+  nothing. Bank 3 therefore remains unproven rather than disproven, and it
+  is the single most valuable thing left to settle: if the bank and
+  parameter numbers are the wrong way round for bank 3 as they were for
+  the fields generally, that is a real defect across 13 addresses.
+- **The two mutes, CC 94 and CC 110.** Confirmed non-functional over MIDI
+  by two independent methods. Spectrally, muting every track leaves the
+  level unchanged; by trig count, a muted track still fires 27, 24 and 28
+  trigs where a working mute would fire none. Neither CC nor NRPN 1:108
+  has any effect. Both numbers are from Appendix C, so the map matches the
+  manual and the manual is not reproducible here.
 - **CC 61.** On WAVETONE this is noise WDTH, and track 1 -- the only track
   reaching these slots -- runs WAVETONE. Measuring the width of a noise
   source against the noise it makes does not separate from its own floor:
@@ -79,6 +97,24 @@ numbers rather than the 183 parameters a naive count suggests.
 What stays unverified is the per-machine naming, which audio cannot
 establish in principle -- a knob slot responds identically whatever it is
 called. That comes from Appendix A, or from the device's own knobs.
+
+## Choosing the metric matters more than tightening it
+
+Three results came from changing what was measured rather than measuring
+better:
+
+- The send effects read 1/8, 0/7 and 4/7 under a sustained note trimmed at
+  700 ms, and 8/8, 7/7 and 7/7 under a 60 ms hit with three seconds of tail
+  kept. Nothing about the map changed.
+- The delay could not be verified by "did the sound change" at all, and is
+  verified exactly by echo spacing: 232, 507, 783 and 1059 ms across
+  settings 20 to 95, which is 11.03 ms per unit.
+- The reverb's decay is invisible to T20, which measures the dry hit, and
+  obvious in late energy: 0.0035 to 0.1449, rank correlation +1.000.
+
+And one result came from a metric that could not work in principle: a
+mono-summed spectral distance cannot see a pan control, so `amp.pan`
+verifies only through stereo balance, at 0.43.
 
 ## Two facts about the instrument this turned up
 
